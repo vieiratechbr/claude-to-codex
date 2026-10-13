@@ -1,0 +1,64 @@
+name: Publish verified v0.1.1
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-v0.1.1.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: publish-v0.1.1
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: vieiratechbr/claude-to-codex
+      RELEASE_COMMIT: ab341acd082eec8d4dfb3a9d0aebd8c10fdfb930
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the successful Windows build and artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/$GH_REPO/actions/runs/38419589295 > build.json
+          jq -e '.conclusion == "success" and .head_branch == "main" and .head_sha == "d77134de2e6d88961402feddc9e1c0fe8d0a06e3"' build.json
+          gh api repos/$GH_REPO/actions/artifacts/11825547851 > artifact.json
+          jq -e '.name == "Windows-installer" and .expired == false and .digest == "sha256:18086c543d556a6541359a0fb9264e4098047790ab10c873b802bb5ab8336d72"' artifact.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: Windows-installer
+          path: release-assets
+          github-token: ${{ github.token }}
+          repository: vieiratechbr/claude-to-codex
+          run-id: 38419589295
+      - name: Prepare download checksum and release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f release-assets/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe
+          (cd release-assets && sha256sum Claude-to-Codex-0.1.1-Windows-x64-Setup.exe > SHA256SUMS.txt)
+          cp docs/releases/v0.1.1.md release-notes.md
+          printf '\n## SHA-256 do instalador publicado\n\n```text\n' >> release-notes.md
+          cat release-assets/SHA256SUMS.txt >> release-notes.md
+          printf '```\n' >> release-notes.md
+      - name: Attach downloads and publish the release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v0.1.1 --json isDraft,targetCommitish > existing-release.json 2>/dev/null; then
+            if jq -e '.isDraft == false' existing-release.json >/dev/null; then
+              echo 'Release already published; preserving existing assets.'
+              exit 0
+            fi
+            jq -e --arg commit "$RELEASE_COMMIT" '.targetCommitish == $commit' existing-release.json
+          else
+            gh release create v0.1.1 --target "$RELEASE_COMMIT" --title 'Claude to Codex v0.1.1 — Windows' --notes-file release-notes.md --draft
+          fi
+          gh release upload v0.1.1 release-assets/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe release-assets/SHA256SUMS.txt --clobber
+          gh release edit v0.1.1 --draft=false --latest --notes-file release-notes.md
+          gh release view v0.1.1 --json url,isDraft,assets
