@@ -12,7 +12,7 @@ export async function runProcess(executable: string, args: readonly string[], op
     const child = spawn(executable, [...args], { cwd: options.cwd, env: options.env ?? process.env, shell: false, windowsHide: true, detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] });
     const out: Buffer[] = []; const err: Buffer[] = []; let bytes = 0; let failure: Error|undefined; let settled = false;
     const stop = (message: string) => {
-      failure ??= new Error(message);
+      if (failure) return; failure = new Error(message);
       if (child.pid) {
         if (process.platform === 'win32') spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).on('error', () => child.kill());
         else { try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); } }
