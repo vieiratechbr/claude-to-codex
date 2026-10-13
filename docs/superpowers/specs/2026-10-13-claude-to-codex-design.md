@@ -2,7 +2,7 @@
 
 Data: 13 de outubro de 2026.
 
-Estado: proposta para revisão do mantenedor, antes da implementação.
+Estado: arquitetura aprovada pelo mantenedor em 13 de outubro de 2026. Implementação autorizada; o plano detalhado será revisado antes de sua execução.
 
 ## Objetivo e requisitos confirmados
 

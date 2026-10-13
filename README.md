@@ -4,7 +4,7 @@ Aplicativo local com janela própria para converter plugins e skills do Claude C
 
 O usuário informa um link do GitHub. A ferramenta identifica os componentes do repositório, adapta o que for necessário para o Codex e apresenta o resultado da conversão e da instalação.
 
-> **Estado atual:** definição da arquitetura. Este repositório contém a documentação inicial; ainda não existe aplicativo executável, instalador ou versão publicada. As funcionalidades descritas abaixo são o escopo previsto.
+> **Estado atual:** arquitetura aprovada e plano de implementação em revisão. Este repositório contém a documentação inicial; ainda não existe aplicativo executável, instalador ou versão publicada. As funcionalidades descritas abaixo são o escopo previsto.
 
 ## Experiência prevista
 
@@ -35,6 +35,8 @@ O motor combinará regras para formatos conhecidos e o Codex instalado para adap
 O aplicativo será local. Baixar repositórios e usar o modelo conectado ao Codex poderá exigir acesso à internet; execução local não significa funcionamento integralmente offline.
 
 Detalhes e critérios de conclusão estão na [proposta de arquitetura](docs/superpowers/specs/2026-10-13-claude-to-codex-design.md).
+
+O [plano de implementação](docs/superpowers/plans/2026-10-13-claude-to-codex.md) organiza a entrega em diagnóstico e leitura da origem, conversão, instalação recuperável, aplicativo desktop, interface e distribuição Windows.
 
 ## Desenvolvimento
 
