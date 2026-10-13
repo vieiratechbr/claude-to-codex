@@ -19,7 +19,7 @@
     "test:desktop": "playwright test",
     "test:packaged": "node scripts/check-packaged.mjs",
     "test:codex-local": "node scripts/check-local-codex.mjs",
-    "dist:win": "npm run build && electron-builder --win nsis --x64"
+    "dist:win": "npm run build && electron-builder --win nsis --x64 --publish never"
   },
   "dependencies": {
     "fflate": "0.8.3",
