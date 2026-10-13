@@ -20,7 +20,7 @@
 
 Limites do snapshot e cache de objetos: 20.000 arquivos, 2 MiB por arquivo e 64 MiB de conteúdo. Uma pasta selecionada limita a leitura dos blobs, incluindo licenças dos ancestrais e destinos de links. Clone e fetch usam história rasa; o filtro Git por tamanho não é um limite agregado de tráfego ou espaço do clone, e pode baixar recursos fora da pasta escolhida.
 
-A adaptação assistida processa uma skill ativa por chamada, com até 1 MiB de prompt e cinco minutos por chamada. O modelo devolve edições de trechos únicos da origem; edições ambíguas, sobrepostas ou em outro caminho são recusadas. O conteúdo adaptado fica limitado a 2 MiB por skill e 8 MiB acumulados. Cópias de templates e documentação inativa do repositório não são adaptadas como skills instaláveis.
+A adaptação assistida processa uma skill ativa por chamada, com até 1 MiB de prompt e cinco minutos por chamada. O modelo devolve edições de trechos únicos da origem; edições ambíguas, sobrepostas ou em outro caminho são recusadas. Uma adaptação com sintaxe residual recebe uma tentativa adicional com feedback da validação; se continuar incompleta, a instalação é bloqueada e a skill aparece na mensagem. Avisos das duas tentativas são preservados. O conteúdo adaptado fica limitado a 2 MiB por skill, e todas as propostas, incluindo diagnósticos e tentativas incompletas, contam no limite acumulado de 8 MiB. Cópias de templates e documentação inativa do repositório não são adaptadas como skills instaláveis.
 
 A conversão não garante equivalência universal nem concede direitos de uso. O reconhecimento pelo CLI confirma o registro do pacote. O comportamento em uma tarefa real e cada integração MCP exigem validação própria.
 

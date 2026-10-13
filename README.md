@@ -53,6 +53,8 @@ Saída: `release/Claude-to-Codex-0.1.2-beta.1-Windows-x64-Setup.exe`. A beta ant
 
 Exemplo verificado: `https://github.com/anthropics/skills`, pasta `skills/frontend-design`; a revisão exata está em [VALIDATION.md](docs/VALIDATION.md). Revise instruções e recursos de terceiros antes de usá-los.
 
+Para **UI UX Pro Max**, use `https://github.com/nextlevelbuilder/ui-ux-pro-max-skill` e, em **Opções avançadas → Pasta**, `.claude/skills/ui-ux-pro-max`. Essa skill principal passou na conversão, instalação isolada e buscas de design, acessibilidade e React. O pacote completo reúne outras seis skills e ficou bloqueado por dependências e workflows auxiliares sem adaptação confirmada. Detalhes e revisão testada estão em [VALIDATION.md](docs/VALIDATION.md).
+
 No **Histórico**, abra uma conversão, prepare uma atualização para revisão, remova uma instalação gerenciada ou recupere uma operação. Uma origem fixada em commit continua fixada nas atualizações.
 
 ## Dados, conta e recuperação
@@ -79,7 +81,7 @@ npm run test:packaged
 
 Testes de instalação usam `CODEX_HOME` temporário. Testes comuns não exigem login nem rede. Veja [contribuição](docs/CONTRIBUTING.md), [arquitetura](docs/superpowers/specs/2026-10-13-claude-to-codex-design.md) e [plano](docs/superpowers/plans/2026-10-13-claude-to-codex.md). O mantenedor trabalha diretamente na **main**.
 
-O teste opcional `npm run test:ui-ux-pro-max` usa a revisão fixada do repositório `nextlevelbuilder/ui-ux-pro-max-skill`, rede e sua conta Codex para adaptação. Instala somente em um perfil temporário e depois executa os scripts de busca convertidos com consultas de teste. Requer Python 3 no PATH, ou `C2C_QA_PYTHON` com o caminho do executável. O relatório fica em `.cache/uipro-assisted-*/report.json`. A skill importada também requer Python no computador de quem a utilizar.
+O teste opcional `npm run test:ui-ux-pro-max` usa a revisão fixada do repositório `nextlevelbuilder/ui-ux-pro-max-skill`, a pasta principal, rede e sua conta Codex para adaptação. Instala somente em um perfil temporário e depois executa os scripts de busca convertidos com consultas de teste. Requer Python 3 no PATH, ou `C2C_QA_PYTHON` com o caminho do executável. O relatório fica em `.cache/uipro-assisted-*/report.json`. Use `C2C_QA_SCOPE=repository` para testar o pacote inteiro e `C2C_QA_SHOW_WINDOW=1` para acompanhar a janela e salvar screenshots. A skill importada também requer Python no computador de quem a utilizar.
 
 ## Licença e referências
 

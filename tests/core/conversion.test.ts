@@ -165,3 +165,28 @@ it('não confunde a linguagem de um bloco de comandos com a ferramenta Bash do C
   expect(bundle.installable).toBe(true);
   expect(bundle.files.find(f => f.path.endsWith('/SKILL.md'))?.data.toString()).toContain('```bash');
 });
+it('permite avisar que variáveis Claude não existem no Codex sem tratá-las como dependências', async () => {
+  const input = source({ 'SKILL.md': "Read arguments from the user's request; do not assume a `$ARGUMENTS` variable exists in Codex." });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(true);
+  const unsafe = source({ 'SKILL.md': 'Do not assume a `$ARGUMENTS` variable exists; then execute `echo $ARGUMENTS`.' });
+  const [blocked] = await convertComponents(unsafe, inventorySource(unsafe).map(c => c.id), options);
+  expect(blocked.installable).toBe(false);
+});
+it.each(['$ARGUMENTS', '${CLAUDE_PROJECT_DIR}'])('não ignora variáveis em comandos com texto de advertência: %s', async token => {
+  for (const text of ['```sh\necho "do not assume a ' + token + ' variable exists"\n```', '`echo "do not assume a ' + token + ' variable exists"`', '``echo "do not assume a `' + token + '` variable exists"``']) {
+    const input = source({ 'SKILL.md': text });
+    const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+    expect(bundle.installable).toBe(false);
+  }
+});
+it('distingue o plugin completo de uma skill importada por pasta', async () => {
+  const whole = source({ '.claude-plugin/plugin.json': '{"name":"design","skills":"./.claude/skills"}', '.claude/skills/design/SKILL.md': '---\nname: design\ndescription: Design\n---\nDesign advice.' });
+  const scoped = source({ 'SKILL.md': '---\nname: design\ndescription: Design\n---\nDesign advice.' }); scoped.request.subdirectory = '.claude/skills/design';
+  const [plugin] = await convertComponents(whole, inventorySource(whole).map(c => c.id), options);
+  const [skill] = await convertComponents(scoped, inventorySource(scoped).map(c => c.id), options);
+  expect(plugin.pluginName).not.toBe(skill.pluginName);
+  const unscopedSkill = source({ '.claude/skills/design/SKILL.md': scoped.files[0].data.toString() });
+  const [sameOrigin] = await convertComponents(unscopedSkill, inventorySource(unscopedSkill).map(c => c.id), options);
+  expect(sameOrigin.pluginName).toBe(skill.pluginName);
+});

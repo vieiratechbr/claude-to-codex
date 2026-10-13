@@ -29,7 +29,8 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
   for (const component of available.filter(c => ids.includes(c.id))) {
     if (options.signal?.aborted) throw new Error('Operação cancelada.');
     const id = randomUUID(); const name = slug(component.name); const owner = new URL(snapshot.request.url).pathname.split('/')[1];
-    const identity = createHash('sha256').update(snapshot.request.url + ':' + component.root).digest('hex').slice(0, 8);
+    const originPath = [snapshot.request.subdirectory, component.root].filter(Boolean).join('/');
+    const identity = createHash('sha256').update(snapshot.request.url + ':' + originPath).digest('hex').slice(0, 8);
     const pluginName = slug(owner + '-' + name).slice(0, 48) + '-' + identity;
     const findings = [...component.findings];
     const files = new Map<string,BundleFile>(); let semantic = false;
@@ -107,8 +108,8 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
       if (options.useCodex) {
         try {
           const proposed = await adaptWithCodex({ files: skills.map(path => ({ path, content: files.get(path)!.data.toString() })), findings }, options);
-          for (const file of proposed.files) { const adapted = adaptSkill(file.content, file.path.split('/').at(-2)!); if (adapted.semantic) throw new Error('A resposta ainda depende de recursos do Claude Code.'); findings.push(...adapted.findings); put(file.path, adapted.text, undefined, true); }
           findings.push(...proposed.findings);
+          for (const file of proposed.files) { const adapted = adaptSkill(file.content, file.path.split('/').at(-2)!); if (adapted.semantic) throw new Error('A skill ' + file.path + ' ainda contém instruções específicas do Claude Code.'); findings.push(...adapted.findings); put(file.path, adapted.text, undefined, true); }
         } catch (error) { findings.push({ code: 'semantic-failed', severity: 'blocking', message: (error as Error).message }); }
       } else findings.push({ code: 'semantic-needed', severity: 'blocking', message: 'Instruções dependentes do Claude: habilite a conversão assistida pelo Codex.' });
     }

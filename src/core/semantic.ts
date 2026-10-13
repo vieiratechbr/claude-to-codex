@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { SemanticResult, ConversionOptions, Finding } from '../shared/contracts';
 import { safeRelativePath, assertOwnedPath } from './paths';
 import { checkedProcess, redact } from './process';
+import { claudeSyntaxMarkers } from './adapters/skills';
 const resultSchema = z.object({
   files: z.array(z.object({ path: z.string().max(220), content: z.string().max(2 * 1024 * 1024) }).strict()).max(1000),
   findings: z.array(z.object({ code: z.string().max(100), severity: z.enum(['info','warning','blocking']), message: z.string().max(2000), file: z.string().max(220).optional() }).strict()).max(1000)
@@ -62,17 +63,30 @@ export async function adaptWithCodex(input: { files: { path: string; content: st
   args.push('-c', 'web_search="disabled"', 'exec', '--ignore-user-config', '--ignore-rules', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', '--cd', root, '--output-schema', schemaPath, '--json', '-');
   const combined: SemanticResult = { files: [], findings: [] }; let responseBytes = 0;
   for (const [index, file] of input.files.entries()) {
-    if (context.signal?.aborted) throw new Error('Operação cancelada.');
-    const prompt = instruction + redact(JSON.stringify({ files: [file], findings: input.findings.filter(f => !f.file || f.file === file.path), skillPaths: input.files.map(f => f.path) }));
-    if (Buffer.byteLength(prompt) > 1024 * 1024) throw new Error('Conteúdo grande demais para uma chamada ao Codex. Separe as skills.');
-    context.onProgress?.({ operationId, stage: 'conversion', message: `Adaptando ${file.path} (${index + 1}/${input.files.length})`, completed: index, total: input.files.length });
-    const response = await checkedProcess(context.diagnostics.codexPath, args, { stdin: prompt, signal: context.signal, timeoutMs: 300000 });
-    const result = patchSchema.parse(finalSemanticJson(response.stdout.toString()));
-    if (result.files.length !== 1 || result.files[0].path !== file.path) throw new Error('O Codex alterou a lista de arquivos permitidos.');
-    const adapted = { path: file.path, content: applyEdits(file.content, result.files[0].edits) };
-    responseBytes += Buffer.byteLength(JSON.stringify({ files: [adapted], findings: result.findings }));
-    if (responseBytes > 8 * 1024 * 1024) throw new Error('Limite de saída semântica acumulada excedido. Separe as skills.');
-    combined.files.push(adapted); combined.findings.push(...result.findings);
+    let candidate = file; let feedback = ''; const skillFindings: Finding[] = [];
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (context.signal?.aborted) throw new Error('Operação cancelada.');
+      const prompt = instruction + redact(JSON.stringify({ files: [candidate], findings: input.findings.filter(f => !f.file || f.file === file.path), skillPaths: input.files.map(f => f.path), validationFeedback: feedback }));
+      if (Buffer.byteLength(prompt) > 1024 * 1024) throw new Error('Conteúdo grande demais para uma chamada ao Codex. Separe as skills.');
+      context.onProgress?.({ operationId, stage: 'conversion', message: `${attempt ? 'Conferindo' : 'Adaptando'} ${file.path} (${index + 1}/${input.files.length})`, completed: index, total: input.files.length });
+      const response = await checkedProcess(context.diagnostics.codexPath, args, { stdin: prompt, signal: context.signal, timeoutMs: 300000 });
+      const result = patchSchema.parse(finalSemanticJson(response.stdout.toString()));
+      if (result.files.length !== 1 || result.files[0].path !== file.path) throw new Error('O Codex alterou a lista de arquivos permitidos.');
+      const adapted = { path: file.path, content: applyEdits(candidate.content, result.files[0].edits) };
+      const proposal = JSON.stringify({ files: [adapted], findings: result.findings });
+      responseBytes += Buffer.byteLength(proposal);
+      if (responseBytes > 8 * 1024 * 1024) throw new Error('Limite de saída semântica acumulada excedido. Separe as skills.');
+      await writeFile(join(root, `proposal-${index}-${attempt}.json`), proposal, { mode: 0o600 });
+      skillFindings.push(...result.findings.map(f => ({ ...f, file: f.file || file.path })));
+      const remaining = claudeSyntaxMarkers(adapted.content);
+      if (remaining.length && !result.findings.some(f => f.severity === 'blocking')) {
+        if (attempt) throw new Error('Adaptação incompleta de ' + file.path + ': ' + remaining.join(', '));
+        candidate = adapted;
+        feedback = 'A revisão ainda detectou estes sinais específicos da origem: ' + remaining.join(', ') + '. Adapte os usos ativos. Nas advertências, descreva recursos da origem genericamente, sem repetir tokens antigos. Preserve o restante e reporte requisitos sem equivalente como blocking.';
+        continue;
+      }
+      combined.files.push(adapted); combined.findings.push(...skillFindings); break;
+    }
   }
   return combined;
 }

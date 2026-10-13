@@ -7,7 +7,7 @@ import type { AnalysisView, BundleView, HistoryView } from '../shared/api';
 import { acquireSource, parseSourceRequest } from '../core/source';
 import { diagnoseCodex } from '../core/codex';
 import { inventorySource } from '../core/inventory';
-import { convertComponents } from '../core/conversion';
+import { convertComponents, digest } from '../core/conversion';
 import { OperationStore, atomicWrite } from '../core/store';
 import { CodexInstaller, saveBundle, loadBundle } from '../core/installer';
 import { assertOwnedPath } from '../core/paths';
@@ -83,7 +83,21 @@ export class AppService {
     const record = await this.store.load(id); if (!record || record.kind !== 'installation' || record.state !== 'installed') throw new Error('Instalação não encontrada.');
     const analysis = await this.analyze(record.data.source);
     if (!analysis.components.some(c => c.id === record.data.componentId)) throw new Error('O componente mudou de localização. Faça uma nova análise e confira a migração.');
-    return this.convert(analysis.id, [record.data.componentId], useCodex);
+    const views = await this.convert(analysis.id, [record.data.componentId], useCodex);
+    const updated: BundleView[] = [];
+    for (const view of views) {
+      const bundle = await loadBundle(this.store, view.id);
+      if (bundle.pluginName !== record.title) {
+        if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(record.title)) throw new Error('Identidade da instalação inválida.');
+        const manifest = bundle.files.find(file => file.path === '.codex-plugin/plugin.json');
+        if (!manifest) throw new Error('Manifest da atualização ausente.');
+        const metadata = JSON.parse(manifest.data.toString()); metadata.name = record.title;
+        manifest.data = Buffer.from(JSON.stringify(metadata, null, 2)); manifest.sha256 = digest(manifest.data);
+        bundle.pluginName = record.title; await saveBundle(this.store, bundle);
+      }
+      updated.push(bundleView(bundle));
+    }
+    return updated;
   }
   async remove(id: string): Promise<InstallResult> { return this.job('removal', async signal => (await this.installer(signal)).remove(id)); }
   async restore(id: string): Promise<InstallResult> { return this.job('recovery', async signal => (await this.installer(signal)).restore(id)); }

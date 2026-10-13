@@ -12,8 +12,8 @@ async function context(): Promise<ConversionOptions> {
   const dataRoot = await mkdtemp(join(tmpdir(), 'c2c-semantic-batch-')); temporary.push(dataRoot);
   return { useCodex: true, dataRoot, diagnostics: { authenticated: true, codexPath: 'codex.exe', capabilities: { exec: true, pluginAdd: true, marketplaceAdd: true, pluginListJson: true, isolatedConversion: true }, findings: [] } };
 }
-function answer(files: { path: string; edits: { oldText: string; newText: string }[] }[]) {
-  return { stdout: Buffer.from(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify({ files, findings: [] }) } })), stderr: '', exitCode: 0 };
+function answer(files: { path: string; edits: { oldText: string; newText: string }[] }[], findings: { code: string; severity: 'warning'; message: string }[] = []) {
+  return { stdout: Buffer.from(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify({ files, findings }) } })), stderr: '', exitCode: 0 };
 }
 function request(options: any) { return JSON.parse(String(options.stdin).split('Material a converter:\n')[1]); }
 it('adapta todas as skills grandes sem exigir uma resposta monolítica do modelo', async () => {
@@ -46,4 +46,31 @@ it('limita o conteúdo combinado mesmo quando cada resposta cabe no orçamento',
   vi.mocked(checkedProcess).mockImplementation(async (_exe, _args, options) => answer([{ path: request(options).files[0].path, edits: [{ oldText: 'ORIGINAL', newText: 'A'.repeat(2 * 1024 * 1024 - 200) }] }]));
   const files = Array.from({ length: 5 }, (_, i) => ({ path: `skills/design-${i}/SKILL.md`, content: 'ORIGINAL' }));
   await expect(adaptWithCodex({ files, findings: [] }, await context())).rejects.toThrow(/acumulada/i);
+});
+it('corrige uma adaptação incompleta com feedback dos sinais restantes', async () => {
+  let calls = 0;
+  vi.mocked(checkedProcess).mockImplementation(async (_exe, _args, options) => {
+    const input = request(options); const file = input.files[0]; calls++;
+    if (calls === 1) return answer([{ path: file.path, edits: [{ oldText: file.content, newText: 'Use Codex. Read $ARGUMENTS.' }] }], [{ code: 'runtime-required', severity: 'warning', message: 'Runtime requires user setup.' }]);
+    expect(input.validationFeedback).toContain('$ARGUMENTS');
+    return answer([{ path: file.path, edits: [{ oldText: '$ARGUMENTS', newText: "the user's request" }] }]);
+  });
+  const result = await adaptWithCodex({ files: [{ path: 'skills/one/SKILL.md', content: 'Use Claude Code.' }], findings: [] }, await context());
+  expect(result.files[0].content).toBe("Use Codex. Read the user's request.");
+  expect(calls).toBe(2);
+  expect(result.findings.some(f => f.code === 'runtime-required' && f.file === 'skills/one/SKILL.md')).toBe(true);
+});
+it('contabiliza também as propostas incompletas antes de gravar diagnósticos', async () => {
+  let calls = 0;
+  vi.mocked(checkedProcess).mockImplementation(async (_exe, _args, options) => {
+    const file = request(options).files[0]; calls++;
+    return answer([{ path: file.path, edits: [{ oldText: file.content, newText: calls % 2 ? 'A'.repeat(900 * 1024) + ' Claude Code.' : 'Use Codex.' }] }]);
+  });
+  const files = Array.from({ length: 10 }, (_, i) => ({ path: `skills/design-${i}/SKILL.md`, content: 'Use Claude Code.' }));
+  await expect(adaptWithCodex({ files, findings: [] }, await context())).rejects.toThrow(/acumulada/i);
+});
+it('encerra a correção após duas tentativas e identifica a skill incompleta', async () => {
+  vi.mocked(checkedProcess).mockResolvedValue(answer([{ path: 'skills/one/SKILL.md', edits: [] }]));
+  await expect(adaptWithCodex({ files: [{ path: 'skills/one/SKILL.md', content: 'Use Claude Code.' }], findings: [] }, await context())).rejects.toThrow(/skills\/one\/SKILL\.md/);
+  expect(checkedProcess).toHaveBeenCalledTimes(2);
 });

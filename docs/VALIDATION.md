@@ -1,6 +1,6 @@
 # Validação
 
-Os registros iniciais abaixo correspondem à versão 0.1.0. A atualização visual 0.1.1 está registrada na última seção.
+Os registros iniciais correspondem à versão 0.1.0. A atualização visual 0.1.1 e a fase beta com repositórios reais 0.1.2-beta.1 estão registradas abaixo.
 
 Conferência local em 13/10/2026: Windows 11 x64 build 26200, Node 24.21.0, npm 11.19.0, Codex CLI 0.157.1, Electron 44.7.0. Estes resultados descrevem esta máquina; cada instalação passa pelo diagnóstico.
 
@@ -76,3 +76,28 @@ Instalador local: `release/design/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe`, 
 A [publicação 38432542471](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38432542471) conferiu o build e o digest do artifact antes de promover seu instalador, gerou o checksum, anexou os arquivos ao rascunho e publicou a release. Não recompilou nem alterou o instalador.
 
 O download público sem autenticação foi conferido. SHA-256 do instalador publicado: `8ea2cea76312695fc4a1f415a827f752b29224f729c6316624d70c3a4ba10075`, igual ao arquivo de checksums e ao digest do asset no GitHub. Authenticode do arquivo baixado: `NotSigned`. Este instalador vem da CI; a geração local separada tem outro hash.
+
+## Beta 0.1.2-beta.1 — UI UX Pro Max
+
+Origem: [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill/tree/7246805992a42b7bba37d4cac83b01416f0c6c44), revisão `7246805992a42b7bba37d4cac83b01416f0c6c44`, licença MIT. Teste em Windows 11 x64 e Codex CLI 0.157.1.
+
+**Skill principal aprovada:** pasta `.claude/skills/ui-ux-pro-max`. O teste percorreu a interface e IPC de produção, aquisição Git real, adaptação com Codex autenticado e instalação com os comandos oficiais em um `CODEX_HOME` temporário. A autenticação utilizada foi a existente; a configuração pessoal permaneceu com o mesmo SHA-256 antes/depois.
+
+- Análise: 10,7 segundos; adaptação: 44,2 segundos nesta execução. São medições locais, não garantias de prazo ou consumo.
+- Pacote convertido: 76 arquivos; zero impedimentos. O modelo substituiu a variável de raiz do Claude pela resolução da pasta do SKILL.md instalado, sem inventar uma variável nativa Codex.
+- Instalação reconhecida pelo CLI. Recursos e licença: 72 arquivos conferidos por SHA-256 entre origem, conversão e instalação.
+- Os scripts Python foram revisados antes do teste e executados somente na cópia convertida e instalada. Download, inventário e conversão não executaram a origem. As buscas usaram `-B`, sem persistência de resultados nem geração de cache Python.
+
+| Busca real | Resultado |
+| --- | --- |
+| `SaaS dashboard analytics --design-system --json` | Data-Dense Dashboard, cor primária `#1E40AF`, fontes Fira Code/Fira Sans |
+| `keyboard accessibility focus --domain ux --json` | 3 recomendações estruturadas |
+| `responsive form state accessibility --stack react --json` | 3 recomendações estruturadas |
+
+**Pacote completo bloqueado:** 689 arquivos na origem, um plugin com sete skills; a conversão gerou 688 arquivos e não instalou o pacote. As definições dos agentes externos `ui-ux-designer` e `frontend-developer` não estão na origem. A adaptação também reportou workflow de slash command não confirmado e ferramentas de tarefas indisponíveis no contexto restrito do conversor. Esse resultado conservador não prova ausência dessas capacidades no Codex: referências auxiliares são preservadas, mas apenas SKILL.md é enviado ao modelo. A aprovação da pasta principal não comprova todos os workflows das outras seis skills.
+
+Correções reproduzidas e testadas: aquisição em lote, links internos com orçamento e contenção, marketplace `./`, referências ancoradas na skill, padrões com candidatos, distinção entre assets obrigatórios e saídas do projeto, exclusão de documentação inativa, adaptação por trechos, correção limitada com feedback, preservação de avisos, separação prosa/comandos e identidade por pasta com manutenção de instalações anteriores. Uma medição da leitura local dos 689 arquivos caiu de aproximadamente 73 segundos para 1 segundo. Clone/fetch rasos evitam o histórico integral; o orçamento agregado não limita o tráfego Git.
+
+Verificação local: `typecheck`, **93 testes automatizados**, ciclo nativo de instalação/atualização/recuperação/remoção e fluxo desktop com origem artificial passaram. O teste nativo é opt-in na suíte comum e foi executado separadamente. O teste real é `npm run test:ui-ux-pro-max`; relatório desta rodada em `.cache/uipro-assisted-QqrIbk/report.json` (ignorado pelo Git). O assistente NSIS não é executado sobre a instalação pessoal; a janela empacotada tem teste separado. macOS/Linux e os outros scripts/integrações das seis skills auxiliares não foram validados.
+
+NSIS local: `release/beta-verified/Claude-to-Codex-0.1.2-beta.1-Windows-x64-Setup.exe`, 113.128.345 bytes, SHA-256 `a6af25bbad710cfa1e6eaa62a8bdf1747218a625b23accf166e93c11f664fd2c`, `NotSigned`. `test:packaged` passou, confirmando versão beta, perfil temporário, ponte isolada e controles de opções avançadas. A licença MIT está no ASAR; fixtures e ferramentas de QA ficam fora do aplicativo distribuído. O instalador da CI poderá ter outro hash por ser uma geração separada.
