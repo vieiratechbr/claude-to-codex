@@ -77,7 +77,7 @@ Testes de instalação usam `CODEX_HOME` temporário. Testes comuns não exigem 
 
 ## Licença e referências
 
-A licença de distribuição do aplicativo aguarda definição do mantenedor. Publicar o código não concede automaticamente licença de reutilização. Recursos importados mantêm suas licenças; dependências têm licenças próprias incluídas no pacote.
+O código do aplicativo é distribuído sob a [licença MIT](LICENSE). Recursos importados mantêm suas licenças originais; a MIT do aplicativo não altera a licença dos plugins e skills convertidos. Dependências têm licenças próprias incluídas no pacote.
 
 - [Plugins do Codex](https://developers.openai.com/plugins/build/plugins)
 - [Execução não interativa](https://learn.chatgpt.com/docs/non-interactive-mode)

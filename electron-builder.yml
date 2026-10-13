@@ -7,6 +7,7 @@ files:
   - dist/main/preload.cjs
   - dist/renderer/**/*
   - package.json
+  - LICENSE
 asar: true
 win:
   target:
