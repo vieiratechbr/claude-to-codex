@@ -1,53 +1,86 @@
 # Claude to Codex
 
-Aplicativo local com janela própria para converter plugins e skills do Claude Code, da Anthropic, e instalá-los no Codex presente na máquina do usuário.
+Aplicativo Windows com janela própria para importar skills e plugins do **Claude Code**, adaptar componentes compatíveis e instalá-los no **Codex instalado na sua máquina**.
 
-O usuário informa um link do GitHub. A ferramenta identifica os componentes do repositório, adapta o que for necessário para o Codex e apresenta o resultado da conversão e da instalação.
+Cole um link do GitHub, selecione os componentes, revise os arquivos e instale. Inclui histórico local, comparação com a origem, exportação ZIP, atualização, remoção e recuperação. A instalação usa os comandos oficiais de plugins e o catálogo local do Codex.
 
-> **Estado atual:** arquitetura aprovada e plano de implementação em revisão. Este repositório contém a documentação inicial; ainda não existe aplicativo executável, instalador ou versão publicada. As funcionalidades descritas abaixo são o escopo previsto.
+**Versão 0.1.0 inicial.** Fluxos verificados no Windows x64 com Codex CLI 0.157.1. Recursos sem equivalente aparecem como impedimentos e bloqueiam a instalação. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md).
 
-## Experiência prevista
+![Janela do aplicativo](docs/images/application.png)
 
-1. Abrir o aplicativo e verificar a instalação do Codex.
-2. Colar o link de um repositório do GitHub.
-3. Selecionar o plugin ou a skill quando houver vários no mesmo repositório.
-4. Analisar e converter os componentes para o Codex.
-5. Conferir as adaptações, dependências e eventuais limitações.
-6. Instalar no Codex e verificar se a instalação foi reconhecida.
+## Requisitos
 
-## Escopo
+- Windows x64; validação realizada no Windows 11.
+- [Git for Windows](https://git-scm.com/downloads/win) instalado.
+- Codex com executável nativo e suporte a `plugin marketplace add`, `plugin add`, `plugin remove` e `plugin list --json`. A tela **Ambiente** verifica os recursos e permite selecionar `codex.exe` fora do PATH.
+- Login no Codex para conversão assistida: `codex login`. O aplicativo reutiliza a autenticação oficial, sem pedir chave de API separada.
+- Internet para baixar repositórios e usar o modelo. Repositórios privados dependem das credenciais Git já configuradas na máquina.
 
-- Aplicativo de desktop com processamento e armazenamento locais.
-- Integração com o Codex instalado, usando seus mecanismos de autenticação e instalação.
-- Descoberta de skills, plugins e seus recursos associados em repositórios do Claude Code.
-- Adaptação de instruções, manifests, referências a ferramentas e configurações.
-- Preservação dos arquivos de apoio, autoria e licenças dos componentes de origem.
-- Relatório por componente, incluindo os casos que exigem configuração ou não possuem equivalente funcional.
-- Histórico local, diagnóstico, atualização e remoção das instalações gerenciadas pelo aplicativo.
-- Backup e recuperação das alterações feitas durante a instalação.
+O instalador inclui o runtime do aplicativo. Não inclui Git, Codex ou dependências dos plugins importados.
 
-A conversão será avaliada pelo comportamento preservado. Renomear arquivos ou substituir o nome de uma plataforma não basta para declarar compatibilidade.
+## Executar e empacotar
 
-## Integração proposta
+Pelo código-fonte, com Node.js 24 ou superior:
 
-O motor combinará regras para formatos conhecidos e o Codex instalado para adaptações que exigem interpretação. A proposta reutiliza a autenticação do próprio Codex e não exige uma chave de API separada para o aplicativo.
+```powershell
+git clone https://github.com/vieiratechbr/claude-to-codex.git
+cd claude-to-codex
+npm ci
+npm run build
+npm start
+```
 
-O aplicativo será local. Baixar repositórios e usar o modelo conectado ao Codex poderá exigir acesso à internet; execução local não significa funcionamento integralmente offline.
+No PowerShell, use `npm.cmd` se a política bloquear `npm.ps1`.
 
-Detalhes e critérios de conclusão estão na [proposta de arquitetura](docs/superpowers/specs/2026-10-13-claude-to-codex-design.md).
+```powershell
+npm run dist:win
+```
 
-O [plano de implementação](docs/superpowers/plans/2026-10-13-claude-to-codex.md) organiza a entrega em diagnóstico e leitura da origem, conversão, instalação recuperável, aplicativo desktop, interface e distribuição Windows.
+Saída: `release/Claude-to-Codex-0.1.0-Windows-x64-Setup.exe`. Instalador por usuário, **sem assinatura digital**. A CI também gera um artifact; confira o resultado na aba Actions. macOS e Linux ainda não foram validados.
 
-## Desenvolvimento
+## Usar
 
-Todo o trabalho deste projeto será realizado diretamente na branch **main**, conforme a decisão do mantenedor. Os commits devem representar etapas verificáveis e manter a documentação alinhada ao estado real do produto.
+1. Abra o aplicativo e confira **Ambiente**.
+2. Cole uma URL de repositório, como `https://github.com/anthropics/skills`. Informe branch/commit e pasta nos campos separados, em vez de colar um link `tree/`.
+3. Clique em **Analisar repositório**. Os objetos Git são lidos sem executar scripts, checkout ou filtros da origem.
+4. Selecione skills/plugins. A conversão assistida envia as instruções selecionadas ao Codex; desative-a para usar apenas os adaptadores locais.
+5. Revise impedimentos, avisos e arquivos. Exporte um ZIP para inspeção externa.
+6. Clique em **Instalar no Codex**. Abra uma nova conversa ou reinicie o Codex para carregar as alterações.
 
-Instruções para executar, testar e empacotar o aplicativo serão adicionadas quando esses comandos existirem e forem verificados.
+Exemplo verificado: `https://github.com/anthropics/skills`, pasta `skills/frontend-design`; a revisão exata está em [VALIDATION.md](docs/VALIDATION.md). Revise instruções e recursos de terceiros antes de usá-los.
 
-## Referências
+No **Histórico**, abra uma conversão, prepare uma atualização para revisão, remova uma instalação gerenciada ou recupere uma operação. Uma origem fixada em commit continua fixada nas atualizações.
 
-- [Modo de execução não interativo do Codex](https://learn.chatgpt.com/docs/non-interactive-mode)
-- [Empacotamento e instalação local de plugins do Codex](https://developers.openai.com/plugins/build/plugins)
-- [Referência de manifests de plugins do Claude Code](https://code.claude.com/docs/en/plugins-reference)
+## Dados, conta e recuperação
 
-Projeto independente, sem afiliação oficial com a Anthropic ou a OpenAI.
+Dados ficam em `%APPDATA%/Claude to Codex`. O destino Codex usa `CODEX_HOME` ou `~/.codex`. Para um perfil alternativo do aplicativo, defina `CLAUDE_TO_CODEX_HOME` com caminho absoluto antes de abri-lo.
+
+A conversão assistida usa `codex exec`, schema, sandbox de leitura e ferramentas desativadas. Não materializa código da origem no workspace do modelo. Depende de rede, disponibilidade e limites da conta Codex.
+
+O catálogo gerenciado chama-se `claude-to-codex-local`. A ferramenta registra snapshots da configuração e do catálogo envolvidos. Recuperação compara o estado atual com o registrado; mudança externa gera conflito e preserva os arquivos atuais. Não apague os dados com recuperação pendente. **Limpar downloads** remove clones temporários e mantém histórico e recuperação.
+
+Uma instalação reconhecida não comprova funcionamento dos scripts, MCPs ou integrações externas da skill. Eles podem exigir software, autorização e configuração próprios. Licenças das origens continuam aplicáveis.
+
+## Verificação e contribuição
+
+```powershell
+npm run typecheck
+npm test
+npm run build
+npm run test:desktop
+npm run test:codex-local
+npm run dist:win
+npm run test:packaged
+```
+
+Testes de instalação usam `CODEX_HOME` temporário. Testes comuns não exigem login nem rede. Veja [contribuição](docs/CONTRIBUTING.md), [arquitetura](docs/superpowers/specs/2026-10-13-claude-to-codex-design.md) e [plano](docs/superpowers/plans/2026-10-13-claude-to-codex.md). O mantenedor trabalha diretamente na **main**.
+
+## Licença e referências
+
+A licença de distribuição do aplicativo aguarda definição do mantenedor. Publicar o código não concede automaticamente licença de reutilização. Recursos importados mantêm suas licenças; dependências têm licenças próprias incluídas no pacote.
+
+- [Plugins do Codex](https://developers.openai.com/plugins/build/plugins)
+- [Execução não interativa](https://learn.chatgpt.com/docs/non-interactive-mode)
+- [Plugins do Claude Code](https://code.claude.com/docs/en/plugins-reference)
+
+Projeto independente, sem afiliação oficial com Anthropic ou OpenAI.

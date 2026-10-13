@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Converta extensões do Claude Code e instale no Codex local.",
   "private": true,
+  "author": "vieiratechbr",
+  "license": "UNLICENSED",
+  "repository": "https://github.com/vieiratechbr/claude-to-codex.git",
   "type": "module",
   "main": "dist/main/index.cjs",
   "engines": {
@@ -14,6 +17,7 @@
     "build": "node scripts/build.mjs",
     "start": "node scripts/start.mjs",
     "test:desktop": "playwright test",
+    "test:packaged": "node scripts/check-packaged.mjs",
     "test:codex-local": "node scripts/check-local-codex.mjs",
     "dist:win": "npm run build && electron-builder --win nsis --x64"
   },
@@ -36,5 +40,8 @@
     "typescript": "7.0.2",
     "vite": "8.3.4",
     "vitest": "5.0.4"
+  },
+  "overrides": {
+    "@electron/get": "5.1.0"
   }
 }

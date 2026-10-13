@@ -1,0 +1,39 @@
+name: Windows verification
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Install native Codex for isolated tests
+        run: npm install --no-save --package-lock=false @openai/codex@0.157.1
+      - name: Locate real Codex executable
+        shell: pwsh
+        run: |
+          $codexExe = Get-ChildItem node_modules/@openai -Recurse -Filter codex.exe | Select-Object -First 1
+          if (!$codexExe) { throw 'Native codex.exe missing' }
+          $codexExe.Directory.FullName >> $env:GITHUB_PATH
+      - run: npm run test:codex-local
+      - run: npm run build
+      - run: npm run test:desktop
+      - run: npm run dist:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - run: npm run test:packaged
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Windows-installer
+          path: release/*Setup.exe

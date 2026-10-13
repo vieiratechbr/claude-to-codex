@@ -21,6 +21,19 @@ describe('origem e contenção', () => {
   it('aceita diretórios e nomes com acentos', () => {
     expect(safeRelativePath('skills/edição/guia.md')).toBe('skills/edição/guia.md');
   });
+  it('limita a leitura à pasta selecionada e preserva a licença dos ancestrais', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'c2c-scoped-')); temporary.push(root);
+    const git = (args: string[]) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', windowsHide: true });
+    git(['init', '-q']); git(['config', 'user.name', 'Fixture']); git(['config', 'user.email', 'fixture@example.invalid']);
+    await mkdir(join(root, 'skills', 'hello'), { recursive: true });
+    await writeFile(join(root, 'skills/hello/SKILL.md'), 'Hello');
+    await writeFile(join(root, 'LICENSE'), 'License fixture');
+    await writeFile(join(root, 'large.bin'), Buffer.alloc(4096));
+    git(['add', '.']); git(['commit', '-qm', 'scoped']);
+    const files = await readGitTree(join(root, '.git'), 'HEAD', { maxFiles: 4, maxFileBytes: 128, maxTotalBytes: 256 }, 'git', undefined, 'skills/hello');
+    expect(files.map(f => f.path).sort()).toEqual(['LICENSE', 'SKILL.md']);
+    await expect(readGitTree(join(root, '.git'), 'HEAD', undefined, 'git', undefined, 'missing')).rejects.toThrow(/pasta/i);
+  });
   it('lê bytes do Git sem aplicar filtros ou executar a origem', async () => {
     const root = await mkdtemp(join(tmpdir(), 'c2c-origem-')); temporary.push(root);
     const git = (args: string[], input?: string) => execFileSync('git', ['-C', root, ...args], { input, encoding: 'utf8', windowsHide: true });

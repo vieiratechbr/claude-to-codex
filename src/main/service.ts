@@ -21,6 +21,9 @@ export function bundleView(bundle: ConversionBundle): BundleView {
 }
 export class AppService {
   readonly store: OperationStore; private active?: { id: string; controller: AbortController };
+  private idleWaiters: (() => void)[] = [];
+  get isBusy(): boolean { return Boolean(this.active); }
+  waitUntilIdle(): Promise<void> { return this.active ? new Promise(resolve => this.idleWaiters.push(resolve)) : Promise.resolve(); }
   constructor(readonly context: ServiceContext) { this.store = new OperationStore(context.dataRoot); }
   async settings(): Promise<{ dataRoot: string; codexHome: string; codexPath?: string }> {
     let codexPath: string|undefined;
@@ -40,7 +43,7 @@ export class AppService {
     progress({ operationId: id, stage, message: 'Operação em andamento.' });
     try { const value = await action(controller.signal, progress); progress({ operationId: id, stage: 'done', message: 'Operação concluída.' }); return value; }
     catch (error) { progress({ operationId: id, stage: controller.signal.aborted ? 'cancelled' : 'error', message: redact((error as Error).message) }); throw error; }
-    finally { this.active = undefined; }
+    finally { this.active = undefined; for (const resolve of this.idleWaiters.splice(0)) resolve(); }
   }
   cancel(id: string): boolean { if (!this.active || this.active.id !== id) return false; this.active.controller.abort(); return true; }
   async analyze(input: unknown): Promise<AnalysisView> {

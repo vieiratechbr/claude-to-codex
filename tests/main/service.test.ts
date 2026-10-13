@@ -3,6 +3,18 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AppService } from '../../src/main/service';
+it('mantém o encerramento pendente até terminar a operação ativa', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'c2c-close-'));
+  let release!: () => void;
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  const service = new AppService({ dataRoot: root, diagnose: async () => { await blocked; return { authenticated: false, capabilities: { exec: false, pluginAdd: false, marketplaceAdd: false, pluginListJson: false, isolatedConversion: false }, findings: [] }; } });
+  const job = service.analyze({ url: 'https://github.com/acme/fixture' }).catch(() => undefined);
+  expect(service.isBusy).toBe(true);
+  let idle = false; const closing = service.waitUntilIdle().then(() => { idle = true; });
+  await Promise.resolve(); expect(idle).toBe(false); release(); await job; await closing;
+  expect(service.isBusy).toBe(false);
+  await rm(root, { recursive: true, force: true });
+});
 it('mantém IDs e estados no processo principal sem aceitar seleção forjada', async () => {
   const root = await mkdtemp(join(tmpdir(), 'c2c-service-'));
   try {

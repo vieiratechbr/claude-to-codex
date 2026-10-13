@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, net } from 'electron';
+import { app, BrowserWindow, protocol, net, dialog } from 'electron';
 import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { mkdir } from 'node:fs/promises';
@@ -24,6 +24,17 @@ export async function bootApp(options: { dataRoot?: string; service?: AppService
   });
   const service = options.service || new AppService({ dataRoot, onProgress: event => { if (!window.isDestroyed()) window.webContents.send('c2c:progress',event); } });
   registerIpc(window,service); window.once('ready-to-show',() => window.show());
+  let closePending = false;
+  window.on('close', event => {
+    if (!service.isBusy) return;
+    event.preventDefault();
+    if (closePending) return;
+    closePending = true;
+    void dialog.showMessageBox(window, { type: 'info', title: 'Operação em andamento', message: 'A operação precisa terminar antes de fechar.', detail: 'A instalação e a recuperação serão concluídas com segurança. Você também pode continuar usando a janela.', buttons: ['Fechar ao concluir', 'Continuar usando'], defaultId: 1, cancelId: 1 }).then(async answer => {
+      if (answer.response === 0) { await service.waitUntilIdle(); window.close(); }
+      closePending = false;
+    });
+  });
   await window.loadURL('app://local/index.html');
   app.on('window-all-closed',() => app.quit());
   return window;

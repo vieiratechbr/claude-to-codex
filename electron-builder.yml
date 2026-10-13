@@ -1,0 +1,23 @@
+appId: br.com.vieiratech.claude-to-codex
+productName: Claude to Codex
+directories:
+  output: release
+files:
+  - dist/main/index.cjs
+  - dist/main/preload.cjs
+  - dist/renderer/**/*
+  - package.json
+asar: true
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: Claude-to-Codex-${version}-Windows-${arch}-Setup.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  runAfterFinish: true
