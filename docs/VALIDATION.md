@@ -25,7 +25,7 @@ Conversão assistida adicional: fixture artificial de saudação mencionando Cla
 
 Instalações foram verificadas em perfis temporários. Nenhum plugin foi instalado no Codex pessoal durante os testes. Não foram executados scripts importados nem validados MCPs de terceiros, edição de vídeo ou tarefas finais de cada skill.
 
-A CI está configurada; o resultado remoto precisa ser verificado após publicação. Geração do NSIS e abertura do executável empacotado são verificações separadas da instalação pelo assistente NSIS, que não foi executado na máquina pessoal. macOS/Linux e assinatura de código não foram validados.
+A CI Windows também passou, conforme a execução registrada abaixo. Geração do NSIS e abertura do executável empacotado são verificações separadas da instalação pelo assistente NSIS, que não foi executado na máquina pessoal. macOS/Linux e assinatura de código não foram validados.
 
 ## Revisão independente
 
@@ -33,4 +33,12 @@ Uma revisão independente identificou nove falhas, corrigidas antes da publicaç
 
 Executável empacotado: `npm run test:packaged` passou com perfil temporário do aplicativo, renderer sem Node, ponte disponível e `app.isPackaged = true`. O arquivo ASAR não inclui a fixture de testes.
 
-Instalador final: SHA-256 `075ccef1c16683ee3db1302253174b866c7a55254e121287b7e916b48b18d8a1`. Estado Authenticode: `NotSigned`.
+Instalador local: SHA-256 `edf8e1b71dcef1309f3da1623227ef017fb8bf4e3f0be76681e77eda3cb7294c`. Estado Authenticode: `NotSigned`.
+
+## GitHub Actions
+
+[Execução 38362744659](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38362744659), commit `e3a4fb3c3432ae189984d608e9feff5c8cdd9174`: **success**. Passaram npm ci, typecheck, 53 testes, ciclo nativo isolado, build, janela desktop, NSIS, janela empacotada e upload do instalador. O pacote é gerado com `--publish never`, sem exigir token de publicação de releases.
+
+A diferença de identidade dos caminhos Windows foi reproduzida com mudança de caixa e corrigida usando o caminho real do filesystem; o servidor também confirmou o ciclo completo. Configurações de outras origens continuam recusadas.
+
+Artifact `Windows-installer`, ID `11795841214`: ZIP SHA-256 `2446866a0a7de6c30139da96e31c771cb7651daa4082d2f6a1c088e66ba3e427`. O hash do ZIP remoto e o hash do instalador local descrevem arquivos diferentes; builds NSIS podem conter timestamps diferentes. As alterações seguintes nesta documentação não modificam o aplicativo verificado.
