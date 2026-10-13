@@ -1,4 +1,4 @@
-# Compatibilidade 0.1.0
+# Compatibilidade 0.1.x
 
 | Origem | Resultado | Limite |
 | --- | --- | --- |

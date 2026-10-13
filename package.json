@@ -1,6 +1,6 @@
 {
   "name": "claude-to-codex",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Converta extensões do Claude Code e instale no Codex local.",
   "private": true,
   "author": "vieiratechbr",

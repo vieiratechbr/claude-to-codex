@@ -4,7 +4,7 @@ Aplicativo Windows com janela própria para importar skills e plugins do **Claud
 
 Cole um link do GitHub, selecione os componentes, revise os arquivos e instale. Inclui histórico local, comparação com a origem, exportação ZIP, atualização, remoção e recuperação. A instalação usa os comandos oficiais de plugins e o catálogo local do Codex.
 
-**Versão 0.1.0 inicial.** Fluxos verificados no Windows x64 com Codex CLI 0.157.1. Recursos sem equivalente aparecem como impedimentos e bloqueiam a instalação. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md).
+**Versão 0.1.1.** Interface com identificação visual de Claude Code e Codex, quatro etapas guiadas e opções avançadas recolhidas. Fluxos verificados no Windows x64 com Codex CLI 0.157.1. Recursos sem equivalente aparecem como impedimentos e bloqueiam a instalação. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md).
 
 ![Janela do aplicativo](docs/images/application.png)
 
@@ -36,16 +36,16 @@ No PowerShell, use `npm.cmd` se a política bloquear `npm.ps1`.
 npm run dist:win
 ```
 
-Saída: `release/Claude-to-Codex-0.1.0-Windows-x64-Setup.exe`. Instalador por usuário, **sem assinatura digital**. A [execução Windows verificada com licença MIT](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38415504430) disponibiliza o download **Windows-installer** na seção Artifacts. macOS e Linux ainda não foram validados.
+Saída: `release/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe`. Instalador por usuário, **sem assinatura digital**. As [execuções Windows](https://github.com/vieiratechbr/claude-to-codex/actions/workflows/ci.yml) disponibilizam o download **Windows-installer** na seção Artifacts quando concluídas com sucesso. Confira a versão e a execução em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
 
 ## Usar
 
 1. Abra o aplicativo e confira **Ambiente**.
-2. Cole uma URL de repositório, como `https://github.com/anthropics/skills`. Informe branch/commit e pasta nos campos separados, em vez de colar um link `tree/`.
+2. Cole uma URL de repositório, como `https://github.com/anthropics/skills`. Para escolher branch/commit ou pasta, abra **Opções avançadas** e preencha os campos separados, em vez de colar um link `tree/`.
 3. Clique em **Analisar repositório**. Os objetos Git são lidos sem executar scripts, checkout ou filtros da origem.
 4. Selecione skills/plugins. A conversão assistida envia as instruções selecionadas ao Codex; desative-a para usar apenas os adaptadores locais.
 5. Revise impedimentos, avisos e arquivos. Exporte um ZIP para inspeção externa.
-6. Clique em **Instalar no Codex**. Abra uma nova conversa ou reinicie o Codex para carregar as alterações.
+6. Clique em **Instalar no Codex**. Cada pacote reconhecido passa a mostrar **Instalado no Codex**. A última etapa indica conclusão quando todos os pacotes desta conversão estão instalados. Abra uma nova conversa ou reinicie o Codex para carregar as alterações.
 
 Exemplo verificado: `https://github.com/anthropics/skills`, pasta `skills/frontend-design`; a revisão exata está em [VALIDATION.md](docs/VALIDATION.md). Revise instruções e recursos de terceiros antes de usá-los.
 
@@ -83,4 +83,4 @@ O código do aplicativo é distribuído sob a [licença MIT](LICENSE). Recursos 
 - [Execução não interativa](https://learn.chatgpt.com/docs/non-interactive-mode)
 - [Plugins do Claude Code](https://code.claude.com/docs/en/plugins-reference)
 
-Projeto independente, sem afiliação oficial com Anthropic ou OpenAI.
+Projeto independente, sem afiliação oficial com Anthropic ou OpenAI. Consulte [identificação visual e marcas](docs/BRANDING.md).
