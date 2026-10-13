@@ -5,7 +5,7 @@ Conferência local em 13/10/2026: Windows 11 x64 build 26200, Node 24.21.0, npm 
 | Conferência | Resultado |
 | --- | --- |
 | npm run typecheck | Passou |
-| npm test | 36 testes passaram; integração nativa separada por opção |
+| npm test | 53 testes passaram; integração nativa separada por opção |
 | npm run test:desktop | Janela real, URL inválida, análise/seleção/revisão, texto hostil escapado, renderer sem Node e instalação real isolada passaram |
 | npm run test:codex-local | Catálogo, instalação, atualização na mesma versão, recuperação e remoção passaram; config.toml pessoal permaneceu byte a byte igual |
 | npm run dist:win | Instalador NSIS x64 gerado |
@@ -27,4 +27,10 @@ Instalações foram verificadas em perfis temporários. Nenhum plugin foi instal
 
 A CI está configurada; o resultado remoto precisa ser verificado após publicação. Geração do NSIS e abertura do executável empacotado são verificações separadas da instalação pelo assistente NSIS, que não foi executado na máquina pessoal. macOS/Linux e assinatura de código não foram validados.
 
+## Revisão independente
+
+Uma revisão independente identificou nove falhas, corrigidas antes da publicação: alteração externa durante falha/recuperação, colisões após remapeamento, hooks/políticas em frontmatter, referências compartilhadas e avisos de licença, manifests de marketplace, aquisição explícita de tags, caminhos de skills ausentes, sintaxe Claude e achados externos de componentes não selecionados. Regressões reproduziram as falhas antes das correções; a suíte completa e o ciclo real de instalação permaneceram verdes. As fixtures de configuração passaram a simular tabelas TOML escritas pelo CLI real, em vez de comentários artificiais.
+
 Executável empacotado: `npm run test:packaged` passou com perfil temporário do aplicativo, renderer sem Node, ponte disponível e `app.isPackaged = true`. O arquivo ASAR não inclui a fixture de testes.
+
+Instalador final: SHA-256 `075ccef1c16683ee3db1302253174b866c7a55254e121287b7e916b48b18d8a1`. Estado Authenticode: `NotSigned`.

@@ -1,6 +1,6 @@
 import type { Finding } from '../../shared/contracts';
 export function adaptMcp(input: unknown): { servers: Record<string,unknown>; findings: Finding[] } {
-  const findings: Finding[] = []; const servers: Record<string,unknown> = {};
+  const findings: Finding[] = []; const servers: Record<string,unknown> = Object.create(null);
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Configuração MCP inválida.');
   const value = input as Record<string,unknown>; const list = value.mcpServers ?? value;
   if (!list || typeof list !== 'object' || Array.isArray(list)) throw new Error('Servidores MCP inválidos.');
@@ -8,7 +8,7 @@ export function adaptMcp(input: unknown): { servers: Record<string,unknown>; fin
     if (!/^[a-zA-Z0-9_-]+$/.test(name) || !raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Servidor MCP inválido.');
     const server = raw as Record<string,unknown>;
     const content = JSON.stringify(server);
-    if (/\$\{(?:CLAUDE_PLUGIN_ROOT|user_config\.)/.test(content)) {
+    if (/\$\{(?:CLAUDE_[A-Z_]+|user_config\.)/.test(content)) {
       findings.push({ code: 'mcp-variable', severity: 'blocking', message: 'O servidor ' + name + ' depende de variáveis do Claude. Configure caminhos e credenciais equivalentes.' }); continue;
     }
     if (server.url) {

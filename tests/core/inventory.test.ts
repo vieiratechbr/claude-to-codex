@@ -24,3 +24,15 @@ it('expõe manifest malformado em vez de perder o plugin', () => {
   const items = inventorySource(snapshot({ '.claude-plugin/plugin.json': '{broken', 'skills/a/SKILL.md': 'A.' }));
   expect(items[0].findings.some(f => f.severity === 'blocking')).toBe(true);
 });
+it('compõe entradas locais do marketplace e expõe fontes externas bloqueadas', () => {
+  const items = inventorySource(snapshot({ '.claude-plugin/marketplace.json': JSON.stringify({ name: 'fixture', plugins: [{ name: 'one', source: './plugins/one', strict: false, commands: './prompts' }, { name: 'remote', source: { source: 'github', repo: 'acme/external' } }] }), 'plugins/one/prompts/hello.md': 'Hello' }));
+  expect(items.map(i => i.name)).toEqual(['one', 'remote']);
+  expect(items[0].manifest?.commands).toBe('./prompts'); expect(items[0].files).toContain('plugins/one/prompts/hello.md');
+  expect(items[1].findings.some(f => f.code === 'external-marketplace-source' && f.severity === 'blocking')).toBe(true);
+});
+it('combina componentes de entrada com manifest existente e informa conflito strict:false', () => {
+  const files = { '.claude-plugin/marketplace.json': '{"name":"fixture","plugins":[{"name":"one","source":"./plugins/one","commands":"./prompts"}]}', 'plugins/one/.claude-plugin/plugin.json': '{"name":"one","skills":"./workflows"}', 'plugins/one/prompts/hello.md': 'Hello', 'plugins/one/workflows/edit/SKILL.md': 'Edit' };
+  const [item] = inventorySource(snapshot(files)); expect(item.manifest?.commands).toBe('./prompts'); expect(item.manifest?.skills).toBe('./workflows');
+  files['.claude-plugin/marketplace.json'] = '{"name":"fixture","plugins":[{"name":"one","source":"./plugins/one","strict":false,"commands":"./prompts"}]}';
+  expect(inventorySource(snapshot(files))[0].findings.some(f => f.code === 'marketplace-manifest-conflict')).toBe(true);
+});

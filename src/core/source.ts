@@ -26,7 +26,7 @@ export async function readGitTree(gitDirectory: string, revision: string, limits
     if (!records.some(record => record.slice(record.indexOf('\t') + 1).startsWith(scope + '/'))) throw new Error('A pasta selecionada não possui arquivos.');
     records = records.filter(record => {
       const path = record.slice(record.indexOf('\t') + 1);
-      return path.startsWith(scope + '/') || ancestors.some(prefix => path.startsWith(prefix) && /^licen[cs]e(?:[._-].*)?$/i.test(path.slice(prefix.length)));
+      return path.startsWith(scope + '/') || ancestors.some(prefix => path.startsWith(prefix) && /^(?:licen[cs]e|notice|copying|copyright)(?:[._-].*)?$/i.test(path.slice(prefix.length)));
     });
   }
   if (records.length > limits.maxFiles) throw new Error('Limite de arquivos excedido.');
@@ -55,11 +55,17 @@ export async function acquireSource(input: SourceRequest, context: SourceContext
   await assertOwnedPath(context.dataRoot, root); await mkdir(join(root, 'empty-hooks'), { recursive: true });
   context.onProgress?.({ operationId: id, stage: 'download', message: 'Baixando a origem sem executar seus arquivos.' });
   await checkedProcess(context.gitPath, ['-c', 'core.hooksPath=' + join(root, 'empty-hooks'), '-c', 'protocol.file.allow=never', 'clone', '--config', 'gc.auto=0', '--config', 'maintenance.auto=false', '--bare', '--filter=blob:none', '--no-tags', '--', request.url, gitDirectory], { signal: context.signal, timeoutMs: 180000 });
-  const resolved = await checkedProcess(context.gitPath, ['--git-dir', gitDirectory, 'rev-parse', '--verify', '--end-of-options', (request.ref || 'HEAD') + '^{commit}'], { signal: context.signal });
-  const commit = resolved.stdout.toString().trim();
-  if (!/^[a-f0-9]{40,64}$/.test(commit)) throw new Error('Commit da origem inválido.');
+  const commit = await resolveSourceCommit(gitDirectory, request.ref, context.gitPath, context.signal);
   const files = await readGitTree(gitDirectory, commit, SOURCE_LIMITS, context.gitPath, context.signal, request.subdirectory);
   if (!files.length) throw new Error('A pasta selecionada não possui arquivos.');
   const warnings = files.filter(f => f.mode === '160000' || f.data.toString('utf8', 0, 100).startsWith('version https://git-lfs.github.com/spec/v1')).map(f => 'Recurso externo não baixado: ' + f.path);
   return { id, request, commit, files, warnings };
+}
+export async function resolveSourceCommit(gitDirectory: string, ref?: string, gitPath = 'git', signal?: AbortSignal): Promise<string> {
+  if (ref && (!/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(ref) || ref.includes('..'))) throw new Error('Referência Git inválida.');
+  if (ref) await checkedProcess(gitPath, ['-c','gc.auto=0','-c','maintenance.auto=false','--git-dir',gitDirectory,'fetch','--no-tags','origin',ref], { signal, timeoutMs: 180000 });
+  const result = await checkedProcess(gitPath, ['--git-dir',gitDirectory,'rev-parse','--verify','--end-of-options',(ref ? 'FETCH_HEAD' : 'HEAD') + '^{commit}'], { signal });
+  const commit = result.stdout.toString().trim();
+  if (!/^[a-f0-9]{40,64}$/.test(commit)) throw new Error('Commit da origem inválido.');
+  return commit;
 }

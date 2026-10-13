@@ -15,6 +15,36 @@ interface StateSnapshot { config: string|null; catalog: string|null }
 interface Transaction {
   action: 'install'|'update'|'remove'; pluginName: string; installationId: string; bundleId?: string;
   before: StateSnapshot; after: StateSnapshot; previous?: OperationRecord;
+  externalConflict?: boolean;
+}
+function unrelatedConfig(snapshot: string|null, name: string, catalogRoot: string): string {
+  const text = snapshot ? Buffer.from(snapshot,'base64').toString() : '';
+  let owned: 'marketplace'|'plugin'|undefined;
+  return text.replace(/\r\n/g,'\n').split('\n').filter(line => {
+    const header = /^\s*\[([^\]]+)\]\s*(?:#.*)?$/.exec(line);
+    if (header) {
+      const normalized = header[1].replace(/[\s"']/g,'');
+      owned = normalized === 'marketplaces.' + MARKETPLACE ? 'marketplace' : normalized === 'plugins.' + name + '@' + MARKETPLACE ? 'plugin' : undefined;
+      return !owned;
+    }
+    if (owned) {
+      const assignment = /^\s*([a-z_]+)\s*=\s*(.*?)\s*$/.exec(line);
+      if (assignment) {
+        const [, key, value] = assignment;
+        if (owned === 'plugin' && key === 'enabled') {
+          if (!/^true\s*(?:#.*)?$/.test(value)) throw new Error('O estado de ativação do plugin mudou. Confira a configuração antes de continuar.');
+          return false;
+        }
+        if (owned === 'marketplace' && ['source_type','source'].includes(key)) {
+          let parsed: unknown;
+          try { parsed = value.startsWith("'") && value.endsWith("'") ? value.slice(1,-1) : JSON.parse(value); } catch { throw new Error('Registro do catálogo não reconhecido. Os arquivos foram preservados.'); }
+          if (key === 'source_type' ? parsed !== 'local' : typeof parsed !== 'string' || resolve(parsed.replace(/^\\\\\?\\/,'')) !== resolve(catalogRoot)) throw new Error('O catálogo registrado aponta para outra origem. Os arquivos foram preservados.');
+          return false;
+        }
+      }
+    }
+    return Boolean(line.trim());
+  }).join('\n');
 }
 export async function saveBundle(store: OperationStore, bundle: ConversionBundle): Promise<void> {
   await store.save({ id: bundle.id, kind: 'bundle', state: bundle.installable ? 'ready' : 'blocked', title: bundle.pluginName, createdAt: new Date().toISOString(), data: { ...bundle, files: bundle.files.map(f => ({ ...f, data: f.data.toString('base64') })) } });
@@ -33,7 +63,7 @@ export class CodexInstaller {
   }
   private async run(args: string[], recovering = false): Promise<any> {
     if (this.context.run) return this.context.run(args);
-    const result = await checkedProcess(this.context.codexPath, ['--disable','remote_plugin','--disable','hooks',...args], {
+    const result = await checkedProcess(this.context.codexPath, ['--disable','remote_plugin','--disable','hooks','--disable','skill_mcp_dependency_install',...args], {
       env: { ...process.env, CODEX_HOME: this.home }, signal: recovering ? undefined : this.context.signal, timeoutMs: 90000
     });
     return JSON.parse(result.stdout.toString());
@@ -57,7 +87,13 @@ export class CodexInstaller {
     try { await file.writeFile(String(process.pid)); return await fn(); }
     finally { await file.close(); await unlink(path); }
   }
-  private async checkpoint(record: OperationRecord): Promise<void> { record.data.after = await this.state(); await this.store.save(record); }
+  private async checkpoint(record: OperationRecord): Promise<void> {
+    const current = await this.state(); const tx = record.data as Transaction;
+    if (unrelatedConfig(current.config, tx.pluginName, this.catalogRoot) !== unrelatedConfig(tx.after.config, tx.pluginName, this.catalogRoot)) {
+      tx.externalConflict = true; await this.store.save(record); throw new Error('A configuração foi alterada externamente durante a operação.');
+    }
+    tx.after = current; await this.store.save(record);
+  }
   private async catalog(name: string, bundleId?: string): Promise<void> {
     await assertOwnedPath(this.context.dataRoot, this.catalogPath);
     const previous = await snapshotFile(this.catalogPath);
@@ -97,6 +133,7 @@ export class CodexInstaller {
       if (action === 'install' && (installed || await this.recognized(pluginName))) throw new Error('Plugin já instalado. Use Atualizar no histórico.');
       if (await lstat(this.home).then(s => s.isSymbolicLink()).catch(() => false)) throw new Error('A pasta do Codex não pode ser um link.');
       const id = randomUUID(); const targetId = installationId || randomUUID(); const before = await this.state();
+      unrelatedConfig(before.config, pluginName, this.catalogRoot);
       const record: OperationRecord = { id, kind: 'transaction', title: pluginName, state: 'prepared', createdAt: new Date().toISOString(), data: { action, pluginName, installationId: targetId, bundleId, before, after: before, previous } satisfies Transaction };
       await this.store.save(record);
       try {
@@ -114,7 +151,8 @@ export class CodexInstaller {
         record.state = 'verified'; await this.store.save(record);
         return { operationId: id, installationId: targetId, state: action === 'install' ? 'installed' : action === 'update' ? 'updated' : 'removed', recognized, findings: [{ code: 'restart-codex', severity: 'info', message: 'Abra uma nova conversa ou reinicie o Codex para carregar as alterações.' }] };
       } catch (error) {
-        record.state = 'failed'; record.data.error = (error as Error).message; await this.checkpoint(record);
+        record.state = 'failed'; record.data.error = (error as Error).message;
+        try { await this.checkpoint(record); } catch { record.data.externalConflict = true; await this.store.save(record); }
         const recovered = await this.restoreInternal(record);
         return { operationId: id, installationId: targetId, state: 'failed', recognized: false, findings: [{ code: 'installation-failed', severity: 'blocking', message: (error as Error).message }, ...recovered.findings] };
       }
@@ -125,23 +163,35 @@ export class CodexInstaller {
   }
   private async restoreInternal(record: OperationRecord): Promise<InstallResult> {
     const tx = record.data as Transaction; const current = await this.state();
-    if (!tx.before || !tx.after || current.config !== tx.after.config || current.catalog !== tx.after.catalog || record.state === 'restored') {
+    if (tx.externalConflict || !tx.before || !tx.after || current.config !== tx.after.config || current.catalog !== tx.after.catalog || record.state === 'restored') {
       return { operationId: record.id, state: 'conflict', recognized: false, findings: [{ code: 'recovery-conflict', severity: 'blocking', message: 'A configuração ou o catálogo mudou após esta operação. Os arquivos atuais foram preservados.' }] };
     }
+    let expected = current;
+    const guard = async (nativeChange = false): Promise<void> => {
+      const state = await this.state();
+      let configMatches = state.config === expected.config;
+      try { if (nativeChange) configMatches = unrelatedConfig(state.config,tx.pluginName,this.catalogRoot) === unrelatedConfig(expected.config,tx.pluginName,this.catalogRoot); }
+      catch { configMatches = false; }
+      if (!configMatches || state.catalog !== expected.catalog) { tx.externalConflict = true; await this.store.save(record); throw new Error('A configuração ou catálogo foi alterado durante a recuperação.'); }
+      expected = state;
+    };
     try {
-      if (await this.recognized(tx.pluginName, true)) await this.run(['plugin','remove',tx.pluginName + '@' + MARKETPLACE,'--json'], true);
+      if (await this.recognized(tx.pluginName, true)) { await guard(); await this.run(['plugin','remove',tx.pluginName + '@' + MARKETPLACE,'--json'], true); await guard(true); }
+      await guard();
       await restoreFile(this.catalogPath, tx.before.catalog);
+      expected.catalog = tx.before.catalog;
       if (tx.previous?.state === 'installed') {
-        await this.run(['plugin','marketplace','add',this.catalogRoot,'--json'], true);
-        await this.run(['plugin','add',tx.pluginName + '@' + MARKETPLACE,'--json'], true);
+        await guard(); await this.run(['plugin','marketplace','add',this.catalogRoot,'--json'], true); await guard(true);
+        await this.run(['plugin','add',tx.pluginName + '@' + MARKETPLACE,'--json'], true); await guard(true);
         await this.store.save(tx.previous);
       } else {
         const currentInstallation = await this.store.load(tx.installationId);
         if (currentInstallation?.kind === 'installation') await this.store.save({ ...currentInstallation, state: 'removed' });
       }
-      await restoreFile(this.configPath, tx.before.config); record.state = 'restored'; await this.store.save(record);
+      await guard(); await restoreFile(this.configPath, tx.before.config); record.state = 'restored'; await this.store.save(record);
       return { operationId: record.id, installationId: tx.installationId, state: 'restored', recognized: tx.previous?.state === 'installed', findings: [{ code: 'restored', severity: 'info', message: 'Estado anterior recuperado.' }] };
     } catch (error) {
+      if (tx.externalConflict) return { operationId: record.id, state: 'conflict', recognized: false, findings: [{ code: 'recovery-conflict', severity: 'blocking', message: 'Mudança externa durante a recuperação. Os arquivos atuais foram preservados.' }] };
       record.state = 'recovery-failed'; await this.checkpoint(record);
       return { operationId: record.id, state: 'failed', recognized: false, findings: [{ code: 'recovery-failed', severity: 'blocking', message: 'Recuperação incompleta: ' + (error as Error).message }] };
     }

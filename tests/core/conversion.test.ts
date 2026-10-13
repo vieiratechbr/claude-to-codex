@@ -51,3 +51,52 @@ it('converte diretório de skills declarado e comandos inline', async () => {
   expect(bundle.files.find(f => f.path === 'skills/command-resumir/SKILL.md')?.data.toString()).toContain('Resuma o texto enviado.');
   expect(bundle.installable).toBe(true);
 });
+it('bloqueia duas origens que convergem ao mesmo destino', async () => {
+  const input = source({ '.claude-plugin/plugin.json': '{"name":"collision","skills":"./workflows"}', 'skills/hello/SKILL.md': 'First', 'workflows/hello/SKILL.md': 'Second' });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(false); expect(bundle.findings.some(f => f.code === 'duplicate-destination')).toBe(true);
+});
+it('bloqueia hooks e campos funcionais de frontmatter em vez de descartá-los', async () => {
+  const input = source({ 'SKILL.md': '---\nname: guarded\ndescription: Guarded\nhooks:\n  PreToolUse:\n    - matcher: "*"\n      hooks: [{type: command, command: validate}]\n---\nDo work.' });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(false); expect(bundle.findings.some(f => f.code === 'source-policy')).toBe(true);
+});
+it('preserva referência compartilhada e avisos ancestrais, e bloqueia referência ausente', async () => {
+  const input = source({ 'skills/hello/SKILL.md': '---\nname: hello\ndescription: Shared\n---\nRead [guide](../../shared/guide.md).', 'shared/guide.md': 'Reference', 'NOTICE': 'Attribution' });
+  const [bundle] = await convertComponents(input, [inventorySource(input)[0].id], options);
+  expect(bundle.files.find(f => f.path === 'shared/guide.md')?.data.toString()).toBe('Reference');
+  expect(bundle.files.find(f => f.path === 'NOTICE')?.data.toString()).toBe('Attribution'); expect(bundle.installable).toBe(true);
+  const missing = source({ 'SKILL.md': 'Read [missing](references/missing.md).' });
+  const [blocked] = await convertComponents(missing, inventorySource(missing).map(c => c.id), options);
+  expect(blocked.installable).toBe(false); expect(blocked.findings.some(f => f.code === 'missing-reference')).toBe(true);
+});
+it('bloqueia skills explicitamente declaradas e ausentes', async () => {
+  const input = source({ '.claude-plugin/plugin.json': '{"name":"partial","skills":["./missing"]}', 'skills/hello/SKILL.md': 'Present' });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(false); expect(bundle.findings.some(f => f.code === 'missing-component-path')).toBe(true);
+});
+it.each(['${CLAUDE_SKILL_DIR}/references/a.md', '${CLAUDE_PROJECT_DIR}/x', '$1', '!`echo unsafe`'])('não libera sintaxe específica %s sem adaptação', async token => {
+  const input = source({ 'SKILL.md': '---\nname: one\ndescription: Native syntax\n---\nRead ' + token });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options); expect(bundle.installable).toBe(false);
+});
+it('não aplica impedimentos externos de componente não selecionado', async () => {
+  const input = source({ 'skills/hello/SKILL.md': 'Hello', 'plugins/other/.claude-plugin/plugin.json': '{"name":"other"}', 'plugins/other/assets/video.mp4': 'version https://git-lfs.github.com/spec/v1\noid sha256:x' });
+  input.warnings = ['Recurso externo não baixado: plugins/other/assets/video.mp4'];
+  const hello = inventorySource(input).find(c => c.kind === 'skill')!;
+  const [bundle] = await convertComponents(input, [hello.id], options); expect(bundle.installable).toBe(true);
+});
+it('remapeia referência compartilhada de plugin aninhado sem perder a origem', async () => {
+  const input = source({ 'plugins/one/.claude-plugin/plugin.json': '{"name":"one"}', 'plugins/one/skills/hello/SKILL.md': 'Read [guide](../../shared/guide.md).', 'plugins/one/shared/guide.md': 'Nested reference' });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(true);
+  expect(bundle.files.find(f => f.path.endsWith('/SKILL.md'))?.data.toString()).toContain('../../shared/guide.md');
+});
+it('preserva servidor MCP cujo nome coincide com propriedade de Object', async () => {
+  const input = source({ '.claude-plugin/plugin.json': '{"name":"mcp"}', '.mcp.json': '{"mcpServers":{"__proto__":{"type":"http","url":"https://example.invalid/mcp"}}}', 'skills/hello/SKILL.md': 'Hello' });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  const mcp = bundle.files.find(f => f.path === '.mcp.json'); expect(mcp).toBeDefined(); expect(Object.keys(JSON.parse(mcp!.data.toString()).mcpServers)).toEqual(['__proto__']);
+});
+it('bloqueia variável de projeto Claude no MCP', async () => {
+  const input = source({ '.claude-plugin/plugin.json': '{"name":"mcp"}', '.mcp.json': '{"mcpServers":{"test":{"command":"node","args":["${CLAUDE_PROJECT_DIR}/server.js"]}}}', 'skills/hello/SKILL.md': 'Hello' });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options); expect(bundle.installable).toBe(false); expect(bundle.findings.some(f => f.code === 'mcp-variable')).toBe(true);
+});

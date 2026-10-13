@@ -8,6 +8,7 @@ import { adaptMcp } from './adapters/mcp';
 import { adaptHooks } from './adapters/hooks';
 import { adaptWithCodex } from './semantic';
 import { resolveLayout } from './adapters/layout';
+import { preserveReferences } from './references';
 export function digest(data: Buffer): string { return createHash('sha256').update(data).digest('hex'); }
 export function validateBundle(bundle: ConversionBundle): Finding[] {
   const findings: Finding[] = []; const seen = new Set<string>();
@@ -30,11 +31,21 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
     const id = randomUUID(); const name = slug(component.name); const owner = new URL(snapshot.request.url).pathname.split('/')[1];
     const identity = createHash('sha256').update(snapshot.request.url + ':' + component.root).digest('hex').slice(0, 8);
     const pluginName = slug(owner + '-' + name).slice(0, 48) + '-' + identity;
-    const findings = [...component.findings, ...snapshot.warnings.map(message => ({ code: 'external-resource', severity: 'blocking' as const, message }))];
+    const findings = [...component.findings];
     const files = new Map<string,BundleFile>(); let semantic = false;
-    const put = (path: string, data: Buffer|string, sourcePath?: string) => { safeRelativePath(path); const bytes = typeof data === 'string' ? Buffer.from(data) : data; files.set(path, { path, data: bytes, sha256: digest(bytes), sourcePath: sourcePath || files.get(path)?.sourcePath }); };
+    const put = (path: string, data: Buffer|string, sourcePath?: string, replace = false) => {
+      safeRelativePath(path); const bytes = typeof data === 'string' ? Buffer.from(data) : data;
+      const key = path.normalize('NFC').toLowerCase(); const previous = [...files.values()].find(f => f.path.normalize('NFC').toLowerCase() === key);
+      if (previous && !replace) {
+        if (previous.sourcePath === sourcePath && previous.data.equals(bytes)) return;
+        findings.push({ code: 'duplicate-destination', severity: 'blocking', message: 'Duas origens usam o destino: ' + path, file: path }); return;
+      }
+      if (previous && replace && previous.path !== path) throw new Error('Substituição de caminho ambígua.');
+      files.set(path, { path, data: bytes, sha256: digest(bytes), sourcePath: sourcePath || previous?.sourcePath });
+    };
     const relative = (path: string) => component.root ? path.slice(component.root.length + 1) : path;
     const sourceFiles = snapshot.files.filter(f => component.files.includes(f.path) && f.mode !== '160000');
+    for (const source of snapshot.files.filter(f => component.files.includes(f.path))) if (source.mode === '160000' || source.data.toString('utf8',0,100).startsWith('version https://git-lfs.github.com/spec/v1')) findings.push({ code: 'external-resource', severity: 'blocking', message: 'Recurso externo não baixado: ' + source.path, file: source.path });
     const layout = resolveLayout(component.manifest || {}, sourceFiles, relative); findings.push(...layout.findings);
     for (const source of sourceFiles) {
       const rel = relative(source.path);
@@ -57,7 +68,7 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
     if (component.kind === 'plugin') for (const prompt of layout.prompts) {
       const skillName = slug(prompt.kind + '-' + prompt.name); const target = 'skills/' + skillName + '/SKILL.md';
       if (files.has(target)) { findings.push({ code: 'duplicate-component', severity: 'blocking', message: 'Componentes diferentes usam o mesmo nome: ' + skillName }); continue; }
-      const adapted = adaptSkill(prompt.text, skillName, prompt.kind); findings.push(...adapted.findings); semantic ||= adapted.semantic; put(target, adapted.text);
+      const adapted = adaptSkill(prompt.text, skillName, prompt.kind); findings.push(...adapted.findings); semantic ||= adapted.semantic; put(target, adapted.text, prompt.sourcePath);
     }
     const manifest = adaptManifest(component.manifest || {}, pluginName, owner); findings.push(...manifest.findings);
     findings.push(...adaptHooks(component.manifest?.hooks !== undefined || sourceFiles.some(f => /(^|\/)hooks\/hooks\.json$/.test(f.path))));
@@ -83,19 +94,25 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
     const skills = [...files.keys()].filter(path => /^skills\/.+\/SKILL\.md$/.test(path));
     if (!skills.length && !Object.keys(servers).length) findings.push({ code: 'empty-package', severity: 'blocking', message: 'Nenhuma skill ou integração convertível encontrada.' });
     if (!skills.length) delete manifest.manifest.skills;
-    const repositoryLicense = snapshot.files.find(f => /^LICENSE(?:\.[^/]+)?$/i.test(f.path));
-    if (repositoryLicense && !files.has('LICENSE')) put('LICENSE', repositoryLicense.data);
+    for (const legal of snapshot.files.filter(f => /(^|\/)(?:licen[cs]e|notice|copying|copyright)(?:[._-][^/]+)?$/i.test(f.path))) {
+      const parent = legal.path.includes('/') ? legal.path.slice(0,legal.path.lastIndexOf('/')) : '';
+      if (!parent || component.root === parent || component.root.startsWith(parent + '/')) {
+        if (!files.has(legal.path)) put(legal.path, legal.data, legal.path);
+      }
+    }
+    preserveReferences(snapshot, files, put, findings);
     put('.codex-plugin/plugin.json', JSON.stringify(manifest.manifest, null, 2));
     options.onProgress?.({ operationId: id, stage: 'conversion', message: 'Adaptando ' + component.name });
     if (semantic) {
       if (options.useCodex) {
         try {
           const proposed = await adaptWithCodex({ files: [...files.values()].filter(f => f.path.endsWith('/SKILL.md')).map(f => ({ path: f.path, content: f.data.toString() })), findings }, options);
-          for (const file of proposed.files) { const adapted = adaptSkill(file.content, file.path.split('/').at(-2)!); if (adapted.semantic) throw new Error('A resposta ainda depende de recursos do Claude Code.'); put(file.path, adapted.text); }
+          for (const file of proposed.files) { const adapted = adaptSkill(file.content, file.path.split('/').at(-2)!); if (adapted.semantic) throw new Error('A resposta ainda depende de recursos do Claude Code.'); findings.push(...adapted.findings); put(file.path, adapted.text, undefined, true); }
           findings.push(...proposed.findings);
         } catch (error) { findings.push({ code: 'semantic-failed', severity: 'blocking', message: (error as Error).message }); }
       } else findings.push({ code: 'semantic-needed', severity: 'blocking', message: 'Instruções dependentes do Claude: habilite a conversão assistida pelo Codex.' });
     }
+    preserveReferences(snapshot, files, put, findings, true);
     const bundle: ConversionBundle = { id, pluginName, sourceCommit: snapshot.commit, files: [...files.values()], findings, installable: false, source: snapshot.request, componentId: component.id, analysisId: snapshot.id };
     findings.push(...validateBundle(bundle)); bundle.installable = !findings.some(f => f.severity === 'blocking'); results.push(bundle);
   }

@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { parseSourceRequest, readGitTree } from '../../src/core/source';
+import { parseSourceRequest, readGitTree, resolveSourceCommit } from '../../src/core/source';
 import { safeRelativePath } from '../../src/core/paths';
 const temporary: string[] = [];
 afterEach(async () => { for (const p of temporary.splice(0)) await rm(p, { recursive: true, force: true }); });
@@ -20,6 +20,14 @@ describe('origem e contenção', () => {
   });
   it('aceita diretórios e nomes com acentos', () => {
     expect(safeRelativePath('skills/edição/guia.md')).toBe('skills/edição/guia.md');
+  });
+  it('adquire tag solicitada ausente em clone sem tags', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'c2c-tag-')); temporary.push(root);
+    const git = (args: string[]) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', windowsHide: true });
+    git(['init', '-q']); git(['config', 'user.name', 'Fixture']); git(['config', 'user.email', 'fixture@example.invalid']);
+    await writeFile(join(root, 'SKILL.md'), 'Tag fixture'); git(['add', '.']); git(['commit', '-qm', 'tag']); git(['tag', 'v1.0.0']);
+    const bare = join(root, 'bare.git'); git(['clone', '--bare', '--no-tags', root, bare]);
+    expect(await resolveSourceCommit(bare, 'v1.0.0')).toBe(git(['rev-parse', 'HEAD']).trim());
   });
   it('limita a leitura à pasta selecionada e preserva a licença dos ancestrais', async () => {
     const root = await mkdtemp(join(tmpdir(), 'c2c-scoped-')); temporary.push(root);
