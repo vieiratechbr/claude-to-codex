@@ -42,3 +42,11 @@ Instalador local: SHA-256 `edf8e1b71dcef1309f3da1623227ef017fb8bf4e3f0be76681e77
 A diferença de identidade dos caminhos Windows foi reproduzida com mudança de caixa e corrigida usando o caminho real do filesystem; o servidor também confirmou o ciclo completo. Configurações de outras origens continuam recusadas.
 
 Artifact `Windows-installer`, ID `11795841214`: ZIP SHA-256 `2446866a0a7de6c30139da96e31c771cb7651daa4082d2f6a1c088e66ba3e427`. O hash do ZIP remoto e o hash do instalador local descrevem arquivos diferentes; builds NSIS podem conter timestamps diferentes. As alterações seguintes nesta documentação não modificam o aplicativo verificado.
+
+## Distribuição com licença MIT
+
+MIT adicionada no commit `37608d63933ec70a6c2f1c2e26b6bfd0da8a0136`, com metadados atualizados e inclusão de LICENSE no aplicativo empacotado. Conferência local: o arquivo LICENSE extraído do ASAR corresponde byte a byte ao arquivo do projeto, e package.json declara MIT. Licenças das origens convertidas permanecem separadas.
+
+[Execução Windows 38415504430](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38415504430): **success**, incluindo testes, integração nativa, janela, instalador e artifact `Windows-installer`, ID `11823652866`. ZIP remoto SHA-256: `acb6d6b0010f421278460a286be3645e187645b435dad187be3deea8d54956f5`.
+
+Instalador local com MIT: `release/mit/Claude-to-Codex-0.1.0-Windows-x64-Setup.exe`, SHA-256 `b4da10f80456153e28cb1302466db27e6617f4530966064b62ed9fac757f6f23`. Esta geração foi feita em diretório separado para preservar a aplicação aberta.
