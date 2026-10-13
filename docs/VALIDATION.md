@@ -71,7 +71,7 @@ Instalador local: `release/design/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe`, 
 
 ## Release pública v0.1.1
 
-[Release v0.1.1](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.1.1), ID `411896505`, publicada como última versão, com instalador Windows x64 e `SHA256SUMS.txt`. Tag no commit `ab341acd082eec8d4dfb3a9d0aebd8c10fdfb930`; a diferença para o build validado é apenas README e VALIDATION.md.
+[Release v0.1.1](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.1.1), ID `411896505`, originalmente publicada como última versão, com instalador Windows x64 e `SHA256SUMS.txt`. Agora marcada como pré-release da fase beta, preservando IDs, arquivos e hashes dos assets. Tag no commit `ab341acd082eec8d4dfb3a9d0aebd8c10fdfb930`; a diferença para o build validado é apenas README e VALIDATION.md.
 
 A [publicação 38432542471](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38432542471) conferiu o build e o digest do artifact antes de promover seu instalador, gerou o checksum, anexou os arquivos ao rascunho e publicou a release. Não recompilou nem alterou o instalador.
 
@@ -101,3 +101,13 @@ Correções reproduzidas e testadas: aquisição em lote, links internos com or�
 Verificação local: `typecheck`, **93 testes automatizados**, ciclo nativo de instalação/atualização/recuperação/remoção e fluxo desktop com origem artificial passaram. O teste nativo é opt-in na suíte comum e foi executado separadamente. O teste real é `npm run test:ui-ux-pro-max`; relatório desta rodada em `.cache/uipro-assisted-QqrIbk/report.json` (ignorado pelo Git). O assistente NSIS não é executado sobre a instalação pessoal; a janela empacotada tem teste separado. macOS/Linux e os outros scripts/integrações das seis skills auxiliares não foram validados.
 
 NSIS local: `release/beta-verified/Claude-to-Codex-0.1.2-beta.1-Windows-x64-Setup.exe`, 113.128.345 bytes, SHA-256 `a6af25bbad710cfa1e6eaa62a8bdf1747218a625b23accf166e93c11f664fd2c`, `NotSigned`. `test:packaged` passou, confirmando versão beta, perfil temporário, ponte isolada e controles de opções avançadas. A licença MIT está no ASAR; fixtures e ferramentas de QA ficam fora do aplicativo distribuído. O instalador da CI poderá ter outro hash por ser uma geração separada.
+
+### Publicação e confirmação nativa
+
+Os mesmos 72 arquivos também foram conferidos no cache nativo criado pelo Codex, e as três buscas foram repetidas nessa cópia com resultados válidos. Registro `nextlevelbuilder-ui-ux-pro-max-16aa3cea@claude-to-codex-local`: `installed: true`, `enabled: true`. Relatório adicional local: `.cache/uipro-assisted-QqrIbk/native-cache-check.json`.
+
+[Verificação Windows 38480138034](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38480138034), commit `35e52f4448c39c23abf4b574a17e53a1a2c6ff0a`: **success**. Artifact `Windows-installer`, ID `11856073475`, digest ZIP `sha256:ae4b314f67ddb4264aea86335687f59e2faf5c498e5ed216cd1370e65cff16f1`.
+
+[Publicação 38480775527](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38480775527): **success**. Promoveu o artifact verificado, conferiu que não havia mudanças de aplicação desde o build e publicou a [release v0.1.2-beta.1](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.1.2-beta.1), ID `412176058`, `draft: false`, `prerelease: true`. Tag no commit `5b89a3d0c96d8cfef5cb0041cc22c4b1507ebe42`; a diferença para o build é README e o workflow de publicação. A [verificação desse commit](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38480775564) também passou.
+
+Download público sem autenticação confirmado: instalador com 113.128.396 bytes, SHA-256 `e47c833dcc041dd2a22dedce1bc3e1a707bebdcb35ae4796408b07e420d3e0fd`, igual ao `SHA256SUMS.txt` e ao digest do asset GitHub `638485741`. Authenticode: `NotSigned`. O instalador publicado e a geração local têm hashes distintos. A licença do ASAR corresponde byte a byte à MIT do projeto.
