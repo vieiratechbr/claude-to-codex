@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { mkdir, open, unlink, readFile, lstat } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -16,6 +17,10 @@ interface Transaction {
   action: 'install'|'update'|'remove'; pluginName: string; installationId: string; bundleId?: string;
   before: StateSnapshot; after: StateSnapshot; previous?: OperationRecord;
   externalConflict?: boolean;
+}
+function canonicalPath(path: string): string {
+  const canonical = realpathSync.native(resolve(path.replace(/^\\\\\?\\/,'')));
+  return process.platform === 'win32' ? canonical.normalize('NFC').toLowerCase() : canonical;
 }
 function unrelatedConfig(snapshot: string|null, name: string, catalogRoot: string): string {
   const text = snapshot ? Buffer.from(snapshot,'base64').toString() : '';
@@ -38,7 +43,7 @@ function unrelatedConfig(snapshot: string|null, name: string, catalogRoot: strin
         if (owned === 'marketplace' && ['source_type','source'].includes(key)) {
           let parsed: unknown;
           try { parsed = value.startsWith("'") && value.endsWith("'") ? value.slice(1,-1) : JSON.parse(value); } catch { throw new Error('Registro do catálogo não reconhecido. Os arquivos foram preservados.'); }
-          if (key === 'source_type' ? parsed !== 'local' : typeof parsed !== 'string' || resolve(parsed.replace(/^\\\\\?\\/,'')) !== resolve(catalogRoot)) throw new Error('O catálogo registrado aponta para outra origem. Os arquivos foram preservados.');
+          if (key === 'source_type' ? parsed !== 'local' : typeof parsed !== 'string' || canonicalPath(parsed) !== canonicalPath(catalogRoot)) throw new Error('O catálogo registrado aponta para outra origem. Os arquivos foram preservados.');
           return false;
         }
       }

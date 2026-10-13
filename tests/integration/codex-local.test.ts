@@ -14,7 +14,7 @@ it.skipIf(process.env.C2C_NATIVE_TEST !== '1')('instala, atualiza, recupera e re
   const original = await readFile(personal).catch(() => null);
   const root = await mkdtemp(join(tmpdir(), 'c2c-native-'));
   try {
-    const dataRoot = join(root, 'data'); const home = join(root, 'home'); await mkdir(home);
+    const dataRoot = process.platform === 'win32' ? join(root, 'data').toUpperCase() : join(root, 'data'); const home = join(root, 'home'); await mkdir(home);
     const store = new OperationStore(dataRoot);
     for (const id of ['native-one', 'native-two']) {
       const files = [
@@ -24,7 +24,7 @@ it.skipIf(process.env.C2C_NATIVE_TEST !== '1')('instala, atualiza, recupera e re
       await saveBundle(store, { id, pluginName: 'c2c-native-fixture', sourceCommit: 'a'.repeat(40), source: { url: 'https://github.com/acme/fixture.git' }, componentId: 'test', files, findings: [], installable: true } satisfies ConversionBundle);
     }
     const installer = new CodexInstaller({ dataRoot, codexPath: diagnostic.codexPath!, codexHome: home });
-    const first = await installer.install('native-one'); expect(first.state).toBe('installed'); expect(first.recognized).toBe(true);
+    const first = await installer.install('native-one'); expect(first.state, JSON.stringify(first.findings)).toBe('installed'); expect(first.recognized).toBe(true);
     const updated = await installer.update(first.installationId!, 'native-two'); expect(updated.state).toBe('updated');
     const restored = await installer.restore(updated.operationId); expect(restored.state).toBe('restored'); expect(restored.recognized).toBe(true);
     const removed = await installer.remove(first.installationId!); expect(removed.state).toBe('removed'); expect(removed.recognized).toBe(false);
