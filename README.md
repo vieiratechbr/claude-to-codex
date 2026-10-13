@@ -6,6 +6,10 @@ Cole um link do GitHub, selecione os componentes, revise os arquivos e instale. 
 
 **Versão 0.1.1.** Interface com identificação visual de Claude Code e Codex, quatro etapas guiadas e opções avançadas recolhidas. Fluxos verificados no Windows x64 com Codex CLI 0.157.1. Recursos sem equivalente aparecem como impedimentos e bloqueiam a instalação. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md).
 
+**[Baixar aplicativo para Windows x64 — v0.1.1](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.1.1/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe)**
+
+Download direto, sem precisar compilar ou acessar artifacts de CI. A [release v0.1.1](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.1.1) inclui requisitos, notas e [checksum SHA-256](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.1.1/SHA256SUMS.txt). Instalador por usuário, sem assinatura digital. [Ver todas as versões](https://github.com/vieiratechbr/claude-to-codex/releases).
+
 ![Janela do aplicativo](docs/images/application.png)
 
 ## Requisitos
@@ -36,7 +40,7 @@ No PowerShell, use `npm.cmd` se a política bloquear `npm.ps1`.
 npm run dist:win
 ```
 
-Saída: `release/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe`. Instalador por usuário, **sem assinatura digital**. A [execução Windows verificada da versão 0.1.1](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38419589295) disponibiliza o download **Windows-installer** na seção Artifacts. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
+Saída: `release/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe`. O instalador pronto está na [release v0.1.1](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.1.1). Ele foi promovido do pacote da [execução Windows verificada](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38419589295), também disponível como **Windows-installer** em Artifacts. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
 
 ## Usar
 

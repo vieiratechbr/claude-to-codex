@@ -68,3 +68,11 @@ Conferências locais realizadas nesta versão:
 Instalador local: `release/design/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe`, SHA-256 `3773058aa9900f8fd7eda2bcdf510a2981813ef33118e10d890d80c1d52e0418`. Authenticode: `NotSigned`. O assistente de instalação NSIS não foi executado na máquina pessoal.
 
 [Execução Windows 38419589295](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38419589295), commit `d77134de2e6d88961402feddc9e1c0fe8d0a06e3`: **success**. Passaram 53 testes, ciclo nativo isolado, fluxo desktop atualizado, NSIS e janela empacotada 0.1.1. Artifact `Windows-installer`, ID `11825547851`; ZIP remoto SHA-256 `18086c543d556a6541359a0fb9264e4098047790ab10c873b802bb5ab8336d72`. O ZIP remoto e o instalador local são arquivos distintos. A atualização deste registro e do link de download não altera o aplicativo verificado.
+
+## Release pública v0.1.1
+
+[Release v0.1.1](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.1.1), ID `411896505`, publicada como última versão, com instalador Windows x64 e `SHA256SUMS.txt`. Tag no commit `ab341acd082eec8d4dfb3a9d0aebd8c10fdfb930`; a diferença para o build validado é apenas README e VALIDATION.md.
+
+A [publicação 38432542471](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38432542471) conferiu o build e o digest do artifact antes de promover seu instalador, gerou o checksum, anexou os arquivos ao rascunho e publicou a release. Não recompilou nem alterou o instalador.
+
+O download público sem autenticação foi conferido. SHA-256 do instalador publicado: `8ea2cea76312695fc4a1f415a827f752b29224f729c6316624d70c3a4ba10075`, igual ao arquivo de checksums e ao digest do asset no GitHub. Authenticode do arquivo baixado: `NotSigned`. Este instalador vem da CI; a geração local separada tem outro hash.
