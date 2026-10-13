@@ -36,7 +36,7 @@ No PowerShell, use `npm.cmd` se a política bloquear `npm.ps1`.
 npm run dist:win
 ```
 
-Saída: `release/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe`. Instalador por usuário, **sem assinatura digital**. As [execuções Windows](https://github.com/vieiratechbr/claude-to-codex/actions/workflows/ci.yml) disponibilizam o download **Windows-installer** na seção Artifacts quando concluídas com sucesso. Confira a versão e a execução em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
+Saída: `release/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe`. Instalador por usuário, **sem assinatura digital**. A [execução Windows verificada da versão 0.1.1](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38419589295) disponibiliza o download **Windows-installer** na seção Artifacts. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
 
 ## Usar
 

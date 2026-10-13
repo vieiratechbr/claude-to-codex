@@ -66,3 +66,5 @@ Conferências locais realizadas nesta versão:
 - LICENSE do ASAR corresponde byte a byte ao projeto; package.json declara MIT; fixture de testes ausente do pacote.
 
 Instalador local: `release/design/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe`, SHA-256 `3773058aa9900f8fd7eda2bcdf510a2981813ef33118e10d890d80c1d52e0418`. Authenticode: `NotSigned`. O assistente de instalação NSIS não foi executado na máquina pessoal.
+
+[Execução Windows 38419589295](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38419589295), commit `d77134de2e6d88961402feddc9e1c0fe8d0a06e3`: **success**. Passaram 53 testes, ciclo nativo isolado, fluxo desktop atualizado, NSIS e janela empacotada 0.1.1. Artifact `Windows-installer`, ID `11825547851`; ZIP remoto SHA-256 `18086c543d556a6541359a0fb9264e4098047790ab10c873b802bb5ab8336d72`. O ZIP remoto e o instalador local são arquivos distintos. A atualização deste registro e do link de download não altera o aplicativo verificado.
