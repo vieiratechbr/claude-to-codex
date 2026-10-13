@@ -84,14 +84,20 @@ export class AppService {
   }
   async remove(id: string): Promise<InstallResult> { return this.job('removal', async signal => (await this.installer(signal)).remove(id)); }
   async restore(id: string): Promise<InstallResult> { return this.job('recovery', async signal => (await this.installer(signal)).restore(id)); }
-  async readPreview(id: string, path: string): Promise<{ text: string; binary: boolean; truncated: boolean }> {
+  async readPreview(id: string, path: string): Promise<{ text: string; original?: string; binary: boolean; truncated: boolean }> {
     const bundle = await loadBundle(this.store, id); const file = bundle.files.find(f => f.path === path); if (!file) throw new Error('Arquivo não pertence a esta conversão.');
     const binary = file.data.includes(0); const truncated = file.data.length > 100000;
-    return { text: binary ? 'Arquivo binário. Exporte o pacote para inspecionar.' : file.data.subarray(0,100000).toString(), binary, truncated };
+    let original: string|undefined;
+    if (!binary && file.sourcePath && bundle.analysisId) {
+      const source = await this.store.load(bundle.analysisId);
+      if (source?.kind === 'analysis') { const origin = source.data.files.find((f: any) => f.path === file.sourcePath); if (origin) original = Buffer.from(origin.data,'base64').subarray(0,100000).toString(); }
+    }
+    return { text: binary ? 'Arquivo binário. Exporte o pacote para inspecionar.' : file.data.subarray(0,100000).toString(), original, binary, truncated };
   }
   async listHistory(): Promise<HistoryView[]> {
     return (await this.store.list()).map(r => ({ id: r.id, kind: r.kind, title: r.title, state: r.state, createdAt: r.createdAt, source: r.kind === 'transaction' ? undefined : r.data?.source || r.data?.request, sourceCommit: r.data?.sourceCommit || r.data?.commit }));
   }
+  async reviewBundle(id: string): Promise<BundleView> { return bundleView(await loadBundle(this.store,id)); }
   async cleanDownloads(): Promise<void> {
     if (this.active) throw new Error('Aguarde a operação em andamento.');
     const path = join(this.context.dataRoot, 'sources'); await assertOwnedPath(this.context.dataRoot, path); await rm(path, { recursive: true, force: true });

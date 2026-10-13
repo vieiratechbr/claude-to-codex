@@ -14,7 +14,8 @@ export interface AppApi {
   remove(id: string): Promise<InstallResult>;
   restore(id: string): Promise<InstallResult>;
   listHistory(): Promise<HistoryView[]>;
-  preview(input: { bundleId: string; path: string }): Promise<{ text: string; binary: boolean; truncated: boolean }>;
+  reviewBundle(id: string): Promise<BundleView>;
+  preview(input: { bundleId: string; path: string }): Promise<{ text: string; original?: string; binary: boolean; truncated: boolean }>;
   exportBundle(id: string): Promise<{ path?: string }>;
   selectCodexExecutable(): Promise<Diagnostics>;
   openDataFolder(): Promise<void>;

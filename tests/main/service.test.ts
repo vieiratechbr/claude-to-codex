@@ -16,6 +16,7 @@ it('mantém IDs e estados no processo principal sem aceitar seleção forjada', 
     expect(bundle.installable).toBe(true);
     const preview = await service.readPreview(bundle.id, bundle.files.find(f => f.path.endsWith('SKILL.md'))!.path);
     expect(preview.text).toContain('Olá.');
+    expect(preview.original).toContain('name: hello');
     await expect(service.readPreview(bundle.id, '../config.toml')).rejects.toThrow();
     expect((await service.listHistory()).some(r => r.kind === 'bundle')).toBe(true);
   } finally { await rm(root, { recursive: true, force: true }); }

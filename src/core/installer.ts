@@ -91,6 +91,8 @@ export class CodexInstaller {
       const pluginName = bundle?.pluginName || previous!.title;
       if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(pluginName)) throw new Error('Nome de plugin inválido.');
       if (previous && previous.title !== pluginName) throw new Error('A atualização não corresponde à instalação selecionada.');
+      if (await lstat(this.home).then(s => s.isSymbolicLink()).catch(() => false)) throw new Error('A pasta do Codex não pode ser um link.');
+      await mkdir(this.home,{ recursive: true });
       const installed = (await this.store.list()).find(r => r.kind === 'installation' && r.title === pluginName && r.state === 'installed');
       if (action === 'install' && (installed || await this.recognized(pluginName))) throw new Error('Plugin já instalado. Use Atualizar no histórico.');
       if (await lstat(this.home).then(s => s.isSymbolicLink()).catch(() => false)) throw new Error('A pasta do Codex não pode ser um link.');

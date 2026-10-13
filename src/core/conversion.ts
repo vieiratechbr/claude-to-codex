@@ -32,7 +32,7 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
     const pluginName = slug(owner + '-' + name).slice(0, 48) + '-' + identity;
     const findings = [...component.findings, ...snapshot.warnings.map(message => ({ code: 'external-resource', severity: 'blocking' as const, message }))];
     const files = new Map<string,BundleFile>(); let semantic = false;
-    const put = (path: string, data: Buffer|string) => { safeRelativePath(path); const bytes = typeof data === 'string' ? Buffer.from(data) : data; files.set(path, { path, data: bytes, sha256: digest(bytes) }); };
+    const put = (path: string, data: Buffer|string, sourcePath?: string) => { safeRelativePath(path); const bytes = typeof data === 'string' ? Buffer.from(data) : data; files.set(path, { path, data: bytes, sha256: digest(bytes), sourcePath: sourcePath || files.get(path)?.sourcePath }); };
     const relative = (path: string) => component.root ? path.slice(component.root.length + 1) : path;
     const sourceFiles = snapshot.files.filter(f => component.files.includes(f.path) && f.mode !== '160000');
     const layout = resolveLayout(component.manifest || {}, sourceFiles, relative); findings.push(...layout.findings);
@@ -40,18 +40,18 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
       const rel = relative(source.path);
       if (rel.startsWith('.claude-plugin/') || rel === '.mcp.json' || rel.startsWith('hooks/')) continue;
       if (component.kind === 'skill') {
-        if (rel === 'LICENSE' || rel.startsWith('LICENSE.')) put(rel, source.data);
+        if (rel === 'LICENSE' || rel.startsWith('LICENSE.')) put(rel, source.data, source.path);
         if (rel === 'SKILL.md') {
-          const adapted = adaptSkill(source.data.toString(), name); findings.push(...adapted.findings); semantic ||= adapted.semantic; put('skills/' + name + '/SKILL.md', adapted.text);
-        } else put('skills/' + name + '/' + rel, source.data);
+          const adapted = adaptSkill(source.data.toString(), name); findings.push(...adapted.findings); semantic ||= adapted.semantic; put('skills/' + name + '/SKILL.md', adapted.text, source.path);
+        } else put('skills/' + name + '/' + rel, source.data, source.path);
       } else {
         const skillRoot = layout.skillRoots.find(root => root ? rel.startsWith(root + '/') : rel === 'SKILL.md');
         if (skillRoot !== undefined) {
           const skillName = slug(skillRoot.split('/').at(-1) || name); const suffix = skillRoot ? rel.slice(skillRoot.length + 1) : rel;
           if (suffix === 'SKILL.md') {
-            const adapted = adaptSkill(source.data.toString(), skillName); findings.push(...adapted.findings); semantic ||= adapted.semantic; put('skills/' + skillName + '/SKILL.md', adapted.text);
-          } else put('skills/' + skillName + '/' + suffix, source.data);
-        } else put(rel, source.data);
+            const adapted = adaptSkill(source.data.toString(), skillName); findings.push(...adapted.findings); semantic ||= adapted.semantic; put('skills/' + skillName + '/SKILL.md', adapted.text, source.path);
+          } else put('skills/' + skillName + '/' + suffix, source.data, source.path);
+        } else put(rel, source.data, source.path);
       }
     }
     if (component.kind === 'plugin') for (const prompt of layout.prompts) {
@@ -96,7 +96,7 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
         } catch (error) { findings.push({ code: 'semantic-failed', severity: 'blocking', message: (error as Error).message }); }
       } else findings.push({ code: 'semantic-needed', severity: 'blocking', message: 'Instruções dependentes do Claude: habilite a conversão assistida pelo Codex.' });
     }
-    const bundle: ConversionBundle = { id, pluginName, sourceCommit: snapshot.commit, files: [...files.values()], findings, installable: false, source: snapshot.request, componentId: component.id };
+    const bundle: ConversionBundle = { id, pluginName, sourceCommit: snapshot.commit, files: [...files.values()], findings, installable: false, source: snapshot.request, componentId: component.id, analysisId: snapshot.id };
     findings.push(...validateBundle(bundle)); bundle.installable = !findings.some(f => f.severity === 'blocking'); results.push(bundle);
   }
   return results;

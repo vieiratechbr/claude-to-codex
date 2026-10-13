@@ -24,6 +24,7 @@ export function registerIpc(window: BrowserWindow, service: AppService): void {
   add('applyUpdate',z.object({ installationId: id, bundleId: id }).strict(),value => service.applyUpdate(value.installationId,value.bundleId));
   add('remove',id,value => service.remove(value)); add('restore',id,value => service.restore(value));
   add('listHistory',noInput,() => service.listHistory());
+  add('reviewBundle',id,value => service.reviewBundle(value));
   add('preview',z.object({ bundleId: id, path: z.string().max(220) }).strict(),value => service.readPreview(value.bundleId,value.path));
   add('cancel',id,value => service.cancel(value));
   add('selectCodexExecutable',noInput,async () => {
