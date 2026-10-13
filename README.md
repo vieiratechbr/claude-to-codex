@@ -4,9 +4,9 @@ Aplicativo Windows com janela própria para importar skills e plugins do **Claud
 
 Cole um link do GitHub, selecione os componentes, revise os arquivos e instale. Inclui histórico local, comparação com a origem, exportação ZIP, atualização, remoção e recuperação. A instalação usa os comandos oficiais de plugins e o catálogo local do Codex.
 
-**Versão 0.1.1.** Interface com identificação visual de Claude Code e Codex, quatro etapas guiadas e opções avançadas recolhidas. Fluxos verificados no Windows x64 com Codex CLI 0.157.1. Recursos sem equivalente aparecem como impedimentos e bloqueiam a instalação. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md).
+**Versão 0.1.2-beta.1 — em testes, ainda não estável.** Importação de repositórios reais com leitura de objetos em lote, links internos seguros e adaptação por skill. Interface com identificação visual de Claude Code e Codex, quatro etapas guiadas e opções avançadas recolhidas. Recursos sem equivalente aparecem como impedimentos e bloqueiam a instalação. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md).
 
-**[Baixar aplicativo para Windows x64 — v0.1.1](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.1.1/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe)**
+**[Baixar beta anterior para Windows x64 — v0.1.1](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.1.1/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe)**
 
 Download direto, sem precisar compilar ou acessar artifacts de CI. A [release v0.1.1](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.1.1) inclui requisitos, notas e [checksum SHA-256](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.1.1/SHA256SUMS.txt). Instalador por usuário, sem assinatura digital. [Ver todas as versões](https://github.com/vieiratechbr/claude-to-codex/releases).
 
@@ -40,7 +40,7 @@ No PowerShell, use `npm.cmd` se a política bloquear `npm.ps1`.
 npm run dist:win
 ```
 
-Saída: `release/Claude-to-Codex-0.1.1-Windows-x64-Setup.exe`. O instalador pronto está na [release v0.1.1](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.1.1). Ele foi promovido do pacote da [execução Windows verificada](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38419589295), também disponível como **Windows-installer** em Artifacts. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
+Saída: `release/Claude-to-Codex-0.1.2-beta.1-Windows-x64-Setup.exe`. A beta anterior continua disponível no link acima até a publicação da nova geração. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
 
 ## Usar
 
@@ -78,6 +78,8 @@ npm run test:packaged
 ```
 
 Testes de instalação usam `CODEX_HOME` temporário. Testes comuns não exigem login nem rede. Veja [contribuição](docs/CONTRIBUTING.md), [arquitetura](docs/superpowers/specs/2026-10-13-claude-to-codex-design.md) e [plano](docs/superpowers/plans/2026-10-13-claude-to-codex.md). O mantenedor trabalha diretamente na **main**.
+
+O teste opcional `npm run test:ui-ux-pro-max` usa a revisão fixada do repositório `nextlevelbuilder/ui-ux-pro-max-skill`, rede e sua conta Codex para adaptação. Instala somente em um perfil temporário e depois executa os scripts de busca convertidos com consultas de teste. Requer Python 3 no PATH, ou `C2C_QA_PYTHON` com o caminho do executável. O relatório fica em `.cache/uipro-assisted-*/report.json`. A skill importada também requer Python no computador de quem a utilizar.
 
 ## Licença e referências
 

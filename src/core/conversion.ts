@@ -106,7 +106,7 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
     if (semantic) {
       if (options.useCodex) {
         try {
-          const proposed = await adaptWithCodex({ files: [...files.values()].filter(f => f.path.endsWith('/SKILL.md')).map(f => ({ path: f.path, content: f.data.toString() })), findings }, options);
+          const proposed = await adaptWithCodex({ files: skills.map(path => ({ path, content: files.get(path)!.data.toString() })), findings }, options);
           for (const file of proposed.files) { const adapted = adaptSkill(file.content, file.path.split('/').at(-2)!); if (adapted.semantic) throw new Error('A resposta ainda depende de recursos do Claude Code.'); findings.push(...adapted.findings); put(file.path, adapted.text, undefined, true); }
           findings.push(...proposed.findings);
         } catch (error) { findings.push({ code: 'semantic-failed', severity: 'blocking', message: (error as Error).message }); }

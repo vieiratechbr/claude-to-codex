@@ -15,10 +15,13 @@
 | allowed-tools/context/disable-model-invocation | Bloqueado | Não simula políticas da origem |
 | Scripts/binários/referências | Arquivos preservados | Nunca executados para analisar/converter; requerem dependências e revisão para uso |
 | Submódulos/Git LFS | Impedimento explícito | Conteúdo externo não é adquirido automaticamente |
-| Links/traversal/dispositivos Windows/colisões de caixa | Recusado | Evita escapes e ambiguidades |
+| Links simbólicos internos para arquivos | Conteúdo materializado | Resolve aliases sem criar links; destinos externos, ausentes, ciclos e links para diretórios são recusados |
+| Traversal/dispositivos Windows/colisões de caixa | Recusado | Evita escapes e ambiguidades |
 
-Limites: 20.000 arquivos, 2 MiB por arquivo e 64 MiB de conteúdo. Uma pasta selecionada limita a leitura dos blobs, incluindo licenças dos ancestrais. Uma chamada assistida aceita até 1 MiB de prompt; separe componentes maiores.
+Limites do snapshot e cache de objetos: 20.000 arquivos, 2 MiB por arquivo e 64 MiB de conteúdo. Uma pasta selecionada limita a leitura dos blobs, incluindo licenças dos ancestrais e destinos de links. Clone e fetch usam história rasa; o filtro Git por tamanho não é um limite agregado de tráfego ou espaço do clone, e pode baixar recursos fora da pasta escolhida.
+
+A adaptação assistida processa uma skill ativa por chamada, com até 1 MiB de prompt e cinco minutos por chamada. O modelo devolve edições de trechos únicos da origem; edições ambíguas, sobrepostas ou em outro caminho são recusadas. O conteúdo adaptado fica limitado a 2 MiB por skill e 8 MiB acumulados. Cópias de templates e documentação inativa do repositório não são adaptadas como skills instaláveis.
 
 A conversão não garante equivalência universal nem concede direitos de uso. O reconhecimento pelo CLI confirma o registro do pacote. O comportamento em uma tarefa real e cada integração MCP exigem validação própria.
 
-Links Markdown locais e caminhos conhecidos de referências/scripts são resolvidos dentro da origem validada e remapeados. Referências ausentes ou dependentes de componentes ativos não selecionados bloqueiam. Licenças e avisos ancestrais são preservados. Configurações de catálogo/ativação alteradas manualmente ou em formato não reconhecido podem exigir conferência manual antes de atualizar ou recuperar.
+Links Markdown locais são resolvidos em relação ao documento; caminhos inline `references/`, `scripts/` e `assets/` usam a pasta da skill como base. Padrões dinâmicos exigem recursos correspondentes. Referências ausentes ou dependentes de componentes ativos não selecionados bloqueiam. Arquivos de projeto ou saídas declaradas explicitamente na origem geram avisos e exigem conferência durante o uso. Documentação inativa não bloqueia a conversão por conter exemplos de caminhos. Licenças e avisos ancestrais são preservados. Configurações de catálogo/ativação alteradas manualmente ou em formato não reconhecido podem exigir conferência manual antes de atualizar ou recuperar.

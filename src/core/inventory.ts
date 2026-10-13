@@ -42,7 +42,7 @@ export function inventorySource(snapshot: SourceSnapshot): SourceComponent[] {
             if (typeof marketplace.metadata?.pluginRoot !== 'string') throw new Error('Fonte local deve começar com ./');
             source = marketplace.metadata.pluginRoot.replace(/^\.\//,'').replace(/\/$/,'') + '/' + source;
           }
-          const root = source === '.' ? catalogRoot : safeRelativePath((catalogRoot ? catalogRoot + '/' : '') + source);
+          const root = source === '.' || source === '' ? catalogRoot : safeRelativePath((catalogRoot ? catalogRoot + '/' : '') + source);
           const existing = items.find(i => i.kind === 'plugin' && i.root === root);
           const fields = Object.fromEntries(Object.entries(entry).filter(([key]) => !['source','strict','category','tags'].includes(key)));
           const components = ['commands','agents','skills','hooks','outputStyles','themes'];

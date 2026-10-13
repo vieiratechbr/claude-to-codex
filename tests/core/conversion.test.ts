@@ -100,3 +100,68 @@ it('bloqueia variável de projeto Claude no MCP', async () => {
   const input = source({ '.claude-plugin/plugin.json': '{"name":"mcp"}', '.mcp.json': '{"mcpServers":{"test":{"command":"node","args":["${CLAUDE_PROJECT_DIR}/server.js"]}}}', 'skills/hello/SKILL.md': 'Hello' });
   const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options); expect(bundle.installable).toBe(false); expect(bundle.findings.some(f => f.code === 'mcp-variable')).toBe(true);
 });
+it('resolve caminhos de scripts em referência a partir da pasta da skill', async () => {
+  const input = source({
+    '.claude-plugin/plugin.json': '{"name":"design","skills":"./.claude/skills"}',
+    '.claude/skills/design/SKILL.md': 'Read [guide](references/guide.md).',
+    '.claude/skills/design/references/guide.md': 'Use `scripts/search.py` and `references/spec.md`.',
+    '.claude/skills/design/scripts/search.py': 'print("fixture search")',
+    '.claude/skills/design/references/spec.md': 'Specification'
+  });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(true);
+  expect(bundle.files.find(f => f.path === 'skills/design/references/guide.md')?.data.toString()).toContain('`scripts/search.py`');
+});
+it('não transforma caminhos de saída e padrões dinâmicos em arquivos ausentes', async () => {
+  const input = source({
+    'SKILL.md': 'Write project `assets/design-tokens.json`. Read `references/{action}.md`.',
+    'references/create.md': 'Create tokens.', 'references/update.md': 'Update tokens.'
+  });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(true);
+  expect(bundle.findings.some(f => f.severity === 'warning')).toBe(true);
+  expect(bundle.files.some(f => f.path.endsWith('references/update.md'))).toBe(true);
+});
+it('não usa documentação inativa do repositório para bloquear a skill', async () => {
+  const input = source({ '.claude-plugin/plugin.json': '{"name":"design"}', 'skills/design/SKILL.md': 'Give design advice.', 'README.md': 'Example: `scripts/nonexistent.py`.' });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(true);
+});
+it('bloqueia um asset obrigatório ausente sem contrato de arquivo do projeto', async () => {
+  const input = source({ 'SKILL.md': 'Read required template `assets/report.docx`.' });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(false);
+  expect(bundle.findings.some(f => f.code === 'missing-reference')).toBe(true);
+});
+it('herda o contrato explícito de arquivos do projeto nas referências da skill', async () => {
+  const input = source({
+    'SKILL.md': 'The scripts read and write project files such as `assets/design-tokens.json`. Read [guide](references/update.md).',
+    'references/update.md': 'Read `assets/design-tokens.css` from the project.'
+  });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(true);
+  expect(bundle.findings.some(f => f.code === 'project-file-reference' && f.file?.endsWith('update.md'))).toBe(true);
+});
+it('bloqueia padrões de referências sem candidatos reais', async () => {
+  const input = source({ 'SKILL.md': 'Read required `references/{action}.md`; actions create and update.' });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(false);
+  expect(bundle.findings.some(f => f.code === 'missing-reference')).toBe(true);
+});
+it('não confunde a saída declarada com outro asset obrigatório no mesmo parágrafo', async () => {
+  const input = source({ 'SKILL.md': 'Write `assets/output.json`; first read required bundled template `assets/report.docx`.' });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(false);
+});
+it.each(['*.md', '?.md'])('preserva e valida recursos do padrão %s', async pattern => {
+  const input = source({ 'SKILL.md': 'Read `references/' + pattern + '`.', 'references/a.md': 'A', 'references/b.md': 'B' });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(true);
+  expect(bundle.files.filter(f => /references\/[ab]\.md$/.test(f.path))).toHaveLength(2);
+});
+it('não confunde a linguagem de um bloco de comandos com a ferramenta Bash do Claude', async () => {
+  const input = source({ 'SKILL.md': 'Run the portable script:\n```bash\npython scripts/search.py demo\n```', 'scripts/search.py': 'print("demo")' });
+  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), options);
+  expect(bundle.installable).toBe(true);
+  expect(bundle.files.find(f => f.path.endsWith('/SKILL.md'))?.data.toString()).toContain('```bash');
+});

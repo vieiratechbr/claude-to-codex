@@ -18,6 +18,8 @@ export function adaptSkill(text: string, name: string, kind: 'skill'|'command'|'
   if (kind === 'agent') findings.push({ code: 'agent-as-skill', severity: 'warning', message: 'Agente adaptado como skill. Não oferece automaticamente isolamento ou delegação de subagente.' });
   const dynamic = /!`[^`]+`/.test(body);
   if (dynamic) findings.push({ code: 'dynamic-command', severity: 'blocking', message: 'Injeção dinâmica de comandos do Claude não tem equivalente comprovado. Adapte o workflow explicitamente.' });
-  const semantic = /\b(?:Claude Code|ClaudeCode|Bash|TodoWrite|AskUserQuestion|MultiEdit)\b|\b(?:tool|ferramenta|use|usar)\s+(?:Read|Write|Edit|Task)\b|\$ARGUMENTS|\$\{CLAUDE_[A-Z_]+\}|(?<!\\)\$\d+|\/\w[\w-]*:[\w-]+/i.test(text);
+  // A Markdown language label is portable; retain checks inside the block itself.
+  const behavior = text.replace(/^[ \t]*(?:`{3,}|~{3,})[ \t]*bash(?=[ \t\r\n]|$)[^\r\n]*$/gim, '');
+  const semantic = /\b(?:Claude Code|ClaudeCode|Bash|TodoWrite|AskUserQuestion|MultiEdit)\b|\b(?:tool|ferramenta|use|usar)\s+(?:Read|Write|Edit|Task)\b|\$ARGUMENTS|\$\{CLAUDE_[A-Z_]+\}|(?<!\\)\$\d+|\/\w[\w-]*:[\w-]+/i.test(behavior);
   return { text: '---\n' + stringify(output) + '---\n\n' + body, findings, semantic };
 }

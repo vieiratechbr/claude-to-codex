@@ -36,3 +36,13 @@ it('combina componentes de entrada com manifest existente e informa conflito str
   files['.claude-plugin/marketplace.json'] = '{"name":"fixture","plugins":[{"name":"one","source":"./plugins/one","strict":false,"commands":"./prompts"}]}';
   expect(inventorySource(snapshot(files))[0].findings.some(f => f.code === 'marketplace-manifest-conflict')).toBe(true);
 });
+it.each(['.', './'])('resolve fonte de marketplace %s para o plugin na raiz', source => {
+  const items = inventorySource(snapshot({
+    '.claude-plugin/plugin.json': '{"name":"design","skills":"./.claude/skills/"}',
+    '.claude-plugin/marketplace.json': JSON.stringify({ name: 'catalog', plugins: [{ name: 'design', source }] }),
+    '.claude/skills/design/SKILL.md': 'Design instructions.'
+  }));
+  expect(items).toHaveLength(1);
+  expect(items[0].root).toBe('');
+  expect(items[0].findings).toEqual([]);
+});
