@@ -1,4 +1,4 @@
-import { access } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
 import { delimiter, join, extname } from 'node:path';
 import { homedir } from 'node:os';
 import type { Diagnostics } from '../shared/contracts';
@@ -6,13 +6,20 @@ import { checkedProcess } from './process';
 export async function findExecutable(name: string, manual?: string): Promise<string|undefined> {
   const candidates: string[] = [];
   if (manual) candidates.push(manual);
-  for (const folder of (process.env.PATH || '').split(delimiter)) candidates.push(join(folder, name + (process.platform === 'win32' ? '.exe' : '')));
-  if (name === 'codex' && process.platform === 'win32') {
-    candidates.push(join(process.env.LOCALAPPDATA || join(homedir(), 'AppData/Local'), 'Programs/OpenAI/Codex/bin/codex.exe'));
+  for (const folder of (process.env.PATH || '').split(delimiter).filter(Boolean)) candidates.push(join(folder, name + (process.platform === 'win32' ? '.exe' : '')));
+  if (process.platform === 'win32') {
+    const localAppData = process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local');
+    if (name === 'codex') candidates.push(join(localAppData, 'Programs', 'OpenAI', 'Codex', 'bin', 'codex.exe'));
+    if (name === 'git') {
+      const gitRoots = [process.env.ProgramFiles, process.env['ProgramFiles(x86)']].filter((path): path is string => Boolean(path)).map(path => join(path, 'Git'));
+      gitRoots.push(join(localAppData, 'Programs', 'Git'));
+      for (const root of gitRoots) candidates.push(join(root, 'cmd', 'git.exe'), join(root, 'bin', 'git.exe'));
+      candidates.push(join(homedir(), '.cache', 'codex-runtimes', 'codex-primary-runtime', 'dependencies', 'native', 'git', 'cmd', 'git.exe'));
+    }
   }
-  for (const file of candidates) {
+  for (const file of new Set(candidates)) {
     if (['.cmd', '.bat'].includes(extname(file).toLowerCase())) continue;
-    try { await access(file); return file; } catch {}
+    try { if ((await stat(file)).isFile()) return file; } catch {}
   }
 }
 export async function diagnoseCodex(settings: { codexPath?: string; gitPath?: string } = {}): Promise<Diagnostics> {

@@ -49,7 +49,7 @@ export class AppService {
   async analyze(input: unknown): Promise<AnalysisView> {
     const request = parseSourceRequest(input);
     return this.job('analysis', async (signal, onProgress) => {
-      const diagnostic = await this.diagnose(); if (!diagnostic.gitPath) throw new Error('Git não encontrado. Instale o Git para baixar repositórios.');
+      const diagnostic = await this.diagnose(); if (!diagnostic.gitPath) throw new Error('Git não encontrado. Instale o Git for Windows e reabra o aplicativo para baixar repositórios.');
       const snapshot = this.context.readSource ? await this.context.readSource(request) : await acquireSource(request, { dataRoot: this.context.dataRoot, gitPath: diagnostic.gitPath, signal, onProgress });
       const components = inventorySource(snapshot);
       if (!components.length) throw new Error('Nenhum plugin ou SKILL.md encontrado. Confira a pasta ou o formato do repositório.');

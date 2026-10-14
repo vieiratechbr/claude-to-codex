@@ -15,7 +15,7 @@ Download direto, sem precisar compilar ou acessar artifacts de CI. A [release v0
 ## Requisitos
 
 - Windows x64; validação realizada no Windows 11.
-- [Git for Windows](https://git-scm.com/downloads/win) instalado.
+- Git disponível. O aplicativo detecta o [Git for Windows](https://git-scm.com/downloads/win) nas instalações comuns por máquina/usuário e o Git do runtime principal do Codex, mesmo fora do PATH. Se nenhum estiver disponível, instale o Git for Windows e reabra o aplicativo.
 - Codex com executável nativo e suporte a `plugin marketplace add`, `plugin add`, `plugin remove` e `plugin list --json`. A tela **Ambiente** verifica os recursos e permite selecionar `codex.exe` fora do PATH.
 - Login no Codex para conversão assistida: `codex login`. O aplicativo reutiliza a autenticação oficial, sem pedir chave de API separada.
 - Internet para baixar repositórios e usar o modelo. Repositórios privados dependem das credenciais Git já configuradas na máquina.
