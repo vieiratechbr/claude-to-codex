@@ -4,11 +4,11 @@ Aplicativo Windows com janela própria para importar skills e plugins do **Claud
 
 Cole um link do GitHub, selecione os componentes, revise os arquivos e instale. Inclui histórico local, comparação com a origem, exportação ZIP, atualização, remoção e recuperação. A instalação usa os comandos oficiais de plugins e o catálogo local do Codex.
 
-**Código-fonte 0.2.0-beta.1 — em testes, ainda não estável.** Permite escolher skills internas de um plugin, destaca impedimentos por arquivo, fornece referências relevantes à adaptação assistida, verifica instalações gerenciadas e consulta novas versões públicas. Recursos sem equivalente aparecem como impedimentos e bloqueiam a instalação. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md). O novo instalador está em validação; o download publicado abaixo corresponde à beta anterior.
+**Versão 0.2.0-beta.1 — em testes, ainda não estável.** Permite escolher skills internas de um plugin, destaca impedimentos por arquivo, fornece referências relevantes à adaptação assistida, verifica instalações gerenciadas e consulta novas versões públicas. Recursos sem equivalente aparecem como impedimentos e bloqueiam a instalação. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md).
 
-**[Baixar beta para Windows x64 — v0.1.2-beta.2](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.1.2-beta.2/Claude-to-Codex-0.1.2-beta.2-Windows-x64-Setup.exe)**
+**[Baixar beta para Windows x64 — v0.2.0-beta.1](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.2.0-beta.1/Claude-to-Codex-0.2.0-beta.1-Windows-x64-Setup.exe)**
 
-Download direto, sem precisar compilar ou acessar artifacts de CI. A [release v0.1.2-beta.2](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.1.2-beta.2) inclui requisitos, notas e [checksum SHA-256](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.1.2-beta.2/SHA256SUMS.txt). Instalador por usuário, sem assinatura digital. [Ver todas as versões](https://github.com/vieiratechbr/claude-to-codex/releases).
+Download direto, sem precisar compilar ou acessar artifacts de CI. A [release v0.2.0-beta.1](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.2.0-beta.1) inclui requisitos, notas e [checksum SHA-256](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.2.0-beta.1/SHA256SUMS.txt). Instalador por usuário, sem assinatura digital. [Ver todas as versões](https://github.com/vieiratechbr/claude-to-codex/releases).
 
 ![Janela do aplicativo](docs/images/application.png)
 
@@ -40,7 +40,7 @@ No PowerShell, use `npm.cmd` se a política bloquear `npm.ps1`.
 npm run dist:win
 ```
 
-Saída: `release/Claude-to-Codex-0.2.0-beta.1-Windows-x64-Setup.exe`. A publicação promove o artifact de uma verificação Windows aprovada, sem recompilar durante a publicação. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
+Saída: `release/Claude-to-Codex-0.2.0-beta.1-Windows-x64-Setup.exe`. O instalador publicado é promovido do artifact da [verificação Windows aprovada](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38512075020), sem recompilar durante a publicação. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
 
 ## Usar
 
