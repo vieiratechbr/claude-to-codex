@@ -1,4 +1,4 @@
-import { ipcMain, dialog, shell, type BrowserWindow } from 'electron';
+import { ipcMain, dialog, shell, clipboard, type BrowserWindow } from 'electron';
 import { z } from 'zod';
 import { writeFile } from 'node:fs/promises';
 import { zipSync } from 'fflate';
@@ -6,6 +6,7 @@ import { isTrustedSender } from './protocol';
 import { AppService } from './service';
 import { loadBundle } from '../core/installer';
 import { redact } from '../core/process';
+import { isTrustedUpdateUrl } from '../core/updates';
 const id = z.string().regex(/^[a-zA-Z0-9-]{1,100}$/);
 export function registerIpc(window: BrowserWindow, service: AppService): void {
   const add = (name: string, schema: z.ZodType, handler: (value: any) => Promise<unknown>|unknown) => {
@@ -20,6 +21,10 @@ export function registerIpc(window: BrowserWindow, service: AppService): void {
   add('analyze',z.object({ url: z.string().max(1000), ref: z.string().max(200).optional(), subdirectory: z.string().max(220).optional() }).strict(),value => service.analyze(value));
   add('convert',z.object({ analysisId: id, componentIds: z.array(id).min(1).max(1000), useCodex: z.boolean() }).strict(),value => service.convert(value.analysisId,value.componentIds,value.useCodex));
   add('install',id,value => service.install(value));
+  add('verifyInstallation',id,value => service.verifyInstallation(value));
+  add('checkForUpdates',noInput,() => service.checkForUpdates());
+  add('openAppUpdate',z.string().max(400),async url => { if (!isTrustedUpdateUrl(url)) throw new Error('Endereço de atualização não autorizado.'); await shell.openExternal(url); });
+  add('copyText',z.string().max(4000),text => clipboard.writeText(text));
   add('prepareUpdate',z.object({ installationId: id, useCodex: z.boolean() }).strict(),value => service.prepareUpdate(value.installationId,value.useCodex));
   add('applyUpdate',z.object({ installationId: id, bundleId: id }).strict(),value => service.applyUpdate(value.installationId,value.bundleId));
   add('remove',id,value => service.remove(value)); add('restore',id,value => service.restore(value));

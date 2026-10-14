@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { parse } from 'yaml';
 import type { SourceSnapshot, SourceComponent } from '../shared/contracts';
 import { safeRelativePath } from './paths';
+import { resolveLayout } from './adapters/layout';
 export function markdownMetadata(text: string): { name?: string; description?: string; [key: string]: unknown } {
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
   if (!match) return {};
@@ -66,6 +67,22 @@ export function inventorySource(snapshot: SourceSnapshot): SourceComponent[] {
     } catch (error) { items.push({ id: createHash('sha256').update(catalog.path).digest('hex').slice(0,24), kind: 'plugin', root: '.marketplace-invalid', name: 'Marketplace inválido', files: [], findings: [{ code: 'invalid-marketplace', severity: 'blocking', message: (error as Error).message }] }); }
   }
   for (const item of items) item.files = item.files.filter(path => !items.some(other => other !== item && other.root && other.root.startsWith(item.root ? item.root + '/' : '') && path.startsWith(other.root + '/')));
+  for (const plugin of items.filter(item => item.kind === 'plugin')) {
+    const sourceFiles = snapshot.files.filter(file => plugin.files.includes(file.path));
+    const relative = (path: string) => plugin.root ? path.slice(plugin.root.length + 1) : path;
+    const layout = resolveLayout(plugin.manifest || {}, sourceFiles, relative);
+    for (const skillRoot of layout.skillRoots) {
+      const root = [plugin.root, skillRoot].filter(Boolean).join('/');
+      const entry = sourceFiles.find(file => relative(file.path) === (skillRoot ? skillRoot + '/' : '') + 'SKILL.md');
+      if (!entry) continue;
+      const findings: SourceComponent['findings'] = []; let meta: ReturnType<typeof markdownMetadata> = {};
+      try { meta = markdownMetadata(entry.data.toString()); } catch { findings.push({ code: 'invalid-frontmatter', severity: 'blocking', message: 'Cabeçalho da skill inválido.', file: entry.path }); }
+      if (plugin.manifest?.hooks || plugin.manifest?.mcpServers || sourceFiles.some(file => relative(file.path) === '.mcp.json' || relative(file.path) === 'hooks/hooks.json')) findings.push({code:'isolated-plugin-settings',severity:'warning',file:entry.path,message:'Esta skill será instalada separadamente. Hooks e integrações do plugin completo não são herdados; confira se suas instruções dependem deles.'});
+      items.push({ id: createHash('sha256').update('skill:' + root).digest('hex').slice(0,24), kind: 'skill', root,
+        name: typeof meta.name === 'string' ? meta.name : root.split('/').at(-1) || plugin.name, parentPluginId: plugin.id, findings,
+        files: sourceFiles.filter(file => (!root || file.path.startsWith(root + '/')) && (root !== plugin.root || !/^\.claude-plugin\/|^hooks\/|^\.mcp\.json$/.test(root ? file.path.slice(root.length + 1) : file.path))).map(file => file.path) });
+    }
+  }
   for (const file of snapshot.files.filter(f => /(^|\/)SKILL\.md$/.test(f.path))) {
     if (items.some(item => !item.root || file.path.startsWith(item.root + '/'))) continue;
     const root = file.path.replace(/(^|\/)SKILL\.md$/, ''); const findings: SourceComponent['findings'] = [];

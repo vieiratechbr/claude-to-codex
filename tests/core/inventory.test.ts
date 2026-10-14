@@ -17,7 +17,7 @@ it('separa plugins de um marketplace', () => {
     'plugins/two/.claude-plugin/plugin.json': '{"name":"two"}',
     'plugins/two/skills/b/SKILL.md': '---\nname: b\ndescription: Segundo\n---\nB.'
   }));
-  expect(items.map(i => i.name).sort()).toEqual(['one', 'two']);
+  expect(items.filter(i => i.kind === 'plugin').map(i => i.name).sort()).toEqual(['one', 'two']);
   expect(items[0].files.some(p => p.includes('plugins/two'))).toBe(false);
 });
 it('expõe manifest malformado em vez de perder o plugin', () => {
@@ -42,7 +42,49 @@ it.each(['.', './'])('resolve fonte de marketplace %s para o plugin na raiz', so
     '.claude-plugin/marketplace.json': JSON.stringify({ name: 'catalog', plugins: [{ name: 'design', source }] }),
     '.claude/skills/design/SKILL.md': 'Design instructions.'
   }));
-  expect(items).toHaveLength(1);
+  expect(items).toHaveLength(2);
   expect(items[0].root).toBe('');
   expect(items[0].findings).toEqual([]);
+  expect(items[1]).toMatchObject({ kind: 'skill', root: '.claude/skills/design', parentPluginId: items[0].id });
+});
+it('expõe apenas skills ativas e mantém seus arquivos no plugin completo', () => {
+  const items = inventorySource(snapshot({
+    '.claude-plugin/plugin.json': '{"name":"design","skills":["./.claude/skills","./.claude/skills"]}',
+    'skills/basic/SKILL.md': '---\nname: basic\ndescription: Básico\n---\nBasic advice.',
+    '.claude/skills/design/SKILL.md': '---\nname: design\ndescription: Design\n---\nRead references/guide.md.',
+    '.claude/skills/design/references/guide.md': 'Guide.',
+    '.claude/skills/design/assets/template/SKILL.md': 'Template instructions.',
+    'cli/assets/claude/SKILL.md': 'Inert CLI template.',
+    'templates/example/SKILL.md': 'Inert example.',
+    'shared/guide.md': 'Shared guide.'
+  }));
+  const parent = items.find(i => i.kind === 'plugin')!;
+  const children = items.filter(i => i.kind === 'skill');
+  expect(children.map(i => i.root).sort()).toEqual(['.claude/skills/design', 'skills/basic']);
+  expect(children.every(i => i.parentPluginId === parent.id)).toBe(true);
+  const design = children.find(i => i.root === '.claude/skills/design')!;
+  expect(design.files).toEqual([
+    '.claude/skills/design/SKILL.md',
+    '.claude/skills/design/references/guide.md',
+    '.claude/skills/design/assets/template/SKILL.md'
+  ]);
+  expect(parent.files).toContain('.claude/skills/design/SKILL.md');
+  expect(parent.files).toContain('cli/assets/claude/SKILL.md');
+  expect(design.manifest).toBeUndefined();
+});
+it('atribui skills ao plugin que contém seus arquivos sem esvaziar o plugin ancestral', () => {
+  const items = inventorySource(snapshot({
+    '.claude-plugin/plugin.json': '{"name":"outer"}',
+    'skills/outer/SKILL.md': 'Outer skill.',
+    'plugins/inner/.claude-plugin/plugin.json': '{"name":"inner","skills":"./workflows"}',
+    'plugins/inner/workflows/inner/SKILL.md': 'Inner skill.',
+    'plugins/inner/workflows/inner/scripts/run.py': 'print("fixture")'
+  }));
+  const outer = items.find(i => i.name === 'outer')!;
+  const inner = items.find(i => i.name === 'inner')!;
+  expect(items.find(i => i.root === 'skills/outer')).toMatchObject({ parentPluginId: outer.id });
+  expect(items.find(i => i.root === 'plugins/inner/workflows/inner')).toMatchObject({ parentPluginId: inner.id });
+  expect(outer.files).toContain('skills/outer/SKILL.md');
+  expect(outer.files.some(p => p.startsWith('plugins/inner/'))).toBe(false);
+  expect(inner.files).toContain('plugins/inner/workflows/inner/scripts/run.py');
 });

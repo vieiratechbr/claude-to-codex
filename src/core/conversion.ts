@@ -25,6 +25,7 @@ export function validateBundle(bundle: ConversionBundle): Finding[] {
 export async function convertComponents(snapshot: SourceSnapshot, ids: string[], options: ConversionOptions): Promise<ConversionBundle[]> {
   const available = inventorySource(snapshot);
   if (!ids.length || new Set(ids).size !== ids.length || ids.some(id => !available.some(c => c.id === id))) throw new Error('Selecione componentes encontrados nesta análise.');
+  if (available.some(component => ids.includes(component.id) && component.parentPluginId && ids.includes(component.parentPluginId))) throw new Error('Seleção sobreposta: escolha o plugin completo ou suas skills separadamente.');
   const results: ConversionBundle[] = [];
   for (const component of available.filter(c => ids.includes(c.id))) {
     if (options.signal?.aborted) throw new Error('Operação cancelada.');
@@ -33,7 +34,7 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
     const identity = createHash('sha256').update(snapshot.request.url + ':' + originPath).digest('hex').slice(0, 8);
     const pluginName = slug(owner + '-' + name).slice(0, 48) + '-' + identity;
     const findings = [...component.findings];
-    const files = new Map<string,BundleFile>(); let semantic = false;
+    const files = new Map<string,BundleFile>(); let semantic = false; const semanticPaths=new Set<string>();
     const put = (path: string, data: Buffer|string, sourcePath?: string, replace = false) => {
       safeRelativePath(path); const bytes = typeof data === 'string' ? Buffer.from(data) : data;
       const key = path.normalize('NFC').toLowerCase(); const previous = [...files.values()].find(f => f.path.normalize('NFC').toLowerCase() === key);
@@ -54,14 +55,14 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
       if (component.kind === 'skill') {
         if (rel === 'LICENSE' || rel.startsWith('LICENSE.')) put(rel, source.data, source.path);
         if (rel === 'SKILL.md') {
-          const adapted = adaptSkill(source.data.toString(), name); findings.push(...adapted.findings); semantic ||= adapted.semantic; put('skills/' + name + '/SKILL.md', adapted.text, source.path);
+          const target = 'skills/' + name + '/SKILL.md'; const adapted = adaptSkill(source.data.toString(), name); findings.push(...adapted.findings.map(f => ({...f,file:f.file || target}))); semantic ||= adapted.semantic; if(adapted.semantic)semanticPaths.add(target); put(target, adapted.text, source.path);
         } else put('skills/' + name + '/' + rel, source.data, source.path);
       } else {
         const skillRoot = layout.skillRoots.find(root => root ? rel.startsWith(root + '/') : rel === 'SKILL.md');
         if (skillRoot !== undefined) {
           const skillName = slug(skillRoot.split('/').at(-1) || name); const suffix = skillRoot ? rel.slice(skillRoot.length + 1) : rel;
           if (suffix === 'SKILL.md') {
-            const adapted = adaptSkill(source.data.toString(), skillName); findings.push(...adapted.findings); semantic ||= adapted.semantic; put('skills/' + skillName + '/SKILL.md', adapted.text, source.path);
+            const target = 'skills/' + skillName + '/SKILL.md'; const adapted = adaptSkill(source.data.toString(), skillName); findings.push(...adapted.findings.map(f => ({...f,file:f.file || target}))); semantic ||= adapted.semantic; if(adapted.semantic)semanticPaths.add(target); put(target, adapted.text, source.path);
           } else put('skills/' + skillName + '/' + suffix, source.data, source.path);
         } else put(rel, source.data, source.path);
       }
@@ -69,7 +70,7 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
     if (component.kind === 'plugin') for (const prompt of layout.prompts) {
       const skillName = slug(prompt.kind + '-' + prompt.name); const target = 'skills/' + skillName + '/SKILL.md';
       if (files.has(target)) { findings.push({ code: 'duplicate-component', severity: 'blocking', message: 'Componentes diferentes usam o mesmo nome: ' + skillName }); continue; }
-      const adapted = adaptSkill(prompt.text, skillName, prompt.kind); findings.push(...adapted.findings); semantic ||= adapted.semantic; put(target, adapted.text, prompt.sourcePath);
+      const adapted = adaptSkill(prompt.text, skillName, prompt.kind); findings.push(...adapted.findings.map(f => ({...f,file:f.file || target}))); semantic ||= adapted.semantic; if(adapted.semantic)semanticPaths.add(target); put(target, adapted.text, prompt.sourcePath);
     }
     const manifest = adaptManifest(component.manifest || {}, pluginName, owner); findings.push(...manifest.findings);
     findings.push(...adaptHooks(component.manifest?.hooks !== undefined || sourceFiles.some(f => /(^|\/)hooks\/hooks\.json$/.test(f.path))));
@@ -92,7 +93,7 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
       catch (error) { findings.push({ code: 'invalid-mcp', severity: 'blocking', message: (error as Error).message }); }
     }
     if (Object.keys(servers).length) { put('.mcp.json', JSON.stringify({ mcpServers: servers }, null, 2)); manifest.manifest.mcpServers = './.mcp.json'; }
-    const skills = [...files.keys()].filter(path => /^skills\/.+\/SKILL\.md$/.test(path));
+    const skills = [...files.keys()].filter(path => /^skills\/[^/]+\/SKILL\.md$/.test(path));
     if (!skills.length && !Object.keys(servers).length) findings.push({ code: 'empty-package', severity: 'blocking', message: 'Nenhuma skill ou integração convertível encontrada.' });
     if (!skills.length) delete manifest.manifest.skills;
     for (const legal of snapshot.files.filter(f => /(^|\/)(?:licen[cs]e|notice|copying|copyright)(?:[._-][^/]+)?$/i.test(f.path))) {
@@ -107,11 +108,11 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
     if (semantic) {
       if (options.useCodex) {
         try {
-          const proposed = await adaptWithCodex({ files: skills.map(path => ({ path, content: files.get(path)!.data.toString() })), findings }, options);
+          const proposed = await adaptWithCodex({ files: skills.map(path => ({ path, content: files.get(path)!.data.toString() })), findings, supportingFiles: [...files.values()] }, options);
           findings.push(...proposed.findings);
           for (const file of proposed.files) { const adapted = adaptSkill(file.content, file.path.split('/').at(-2)!); if (adapted.semantic) throw new Error('A skill ' + file.path + ' ainda contém instruções específicas do Claude Code.'); findings.push(...adapted.findings); put(file.path, adapted.text, undefined, true); }
-        } catch (error) { findings.push({ code: 'semantic-failed', severity: 'blocking', message: (error as Error).message }); }
-      } else findings.push({ code: 'semantic-needed', severity: 'blocking', message: 'Instruções dependentes do Claude: habilite a conversão assistida pelo Codex.' });
+        } catch (error) { findings.push({ code: 'semantic-failed', severity: 'blocking', message: (error as Error).message, file:(error as Error).message.match(/skills\/[a-z0-9-]+\/SKILL\.md/)?.[0] }); }
+      } else for(const path of semanticPaths) findings.push({ code: 'semantic-needed', severity: 'blocking',file:path, message: 'Instruções dependentes do Claude: habilite a conversão assistida pelo Codex.' });
     }
     preserveReferences(snapshot, files, put, findings, true);
     const bundle: ConversionBundle = { id, pluginName, sourceCommit: snapshot.commit, files: [...files.values()], findings, installable: false, source: snapshot.request, componentId: component.id, analysisId: snapshot.id };

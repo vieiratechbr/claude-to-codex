@@ -45,5 +45,5 @@ export function resolveLayout(manifest: Record<string,unknown>, files: SourceFil
       }
     } catch (error) { findings.push({ code: 'invalid-layout', severity: 'blocking', message: (error as Error).message }); }
   }
-  return { skillRoots, prompts, findings };
+  return { skillRoots: [...new Set(skillRoots)].filter(root => !skillRoots.some(parent => parent !== root && (!parent || root.startsWith(parent + '/')))), prompts, findings };
 }

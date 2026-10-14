@@ -1,6 +1,6 @@
 # Validação
 
-Os registros iniciais correspondem à versão 0.1.0. A atualização visual 0.1.1 e a fase beta com repositórios reais 0.1.2-beta.1 estão registradas abaixo.
+Os registros abaixo são históricos por versão. A beta 0.2.0-beta.1 acrescenta seleção de skills internas, contexto de referências, diagnóstico da instalação e consulta de releases; suas evidências estão ao final.
 
 Conferência local em 13/10/2026: Windows 11 x64 build 26200, Node 24.21.0, npm 11.19.0, Codex CLI 0.157.1, Electron 44.7.0. Estes resultados descrevem esta máquina; cada instalação passa pelo diagnóstico.
 
@@ -127,3 +127,41 @@ Instalador local `release/beta-git-fix/Claude-to-Codex-0.1.2-beta.2-Windows-x64-
 [Publicação 38497557897](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38497557897): **success**. Release [v0.1.2-beta.2](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.1.2-beta.2), ID `412260410`, `draft: false`, `prerelease: true`. Tag no commit `12d40d034c41ae1a91c8d977f89c8c19d36ce076`. As versões anteriores foram preservadas.
 
 Download público sem autenticação confirmado: instalador com 113.128.495 bytes, SHA-256 `3788e64d311fd3b30e11a83ea548063fba5e11a93a961176a1f76acffa8de165`, igual ao `SHA256SUMS.txt` e ao digest do asset GitHub `638866323`; Authenticode `NotSigned`. Relatório local `.cache/download-beta2/report.json`. Esta é a geração da CI; o instalador local tem outro hash. O assistente de instalação não foi executado sobre o aplicativo pessoal.
+
+## Beta 0.2.0-beta.1 — seleção e verificação
+
+Conferência local em 14/10/2026: Windows 11 x64, Node 24.21.0, npm 11.19.0, Codex CLI 0.157.1, Electron 44.7.0 e Python 3.12.14 do runtime principal do Codex.
+
+As cinco melhorias aprovadas foram implementadas: escolhas individuais de skills ativas de um plugin, impedimentos por arquivo com retorno à seleção, contexto relevante somente leitura na adaptação, diagnóstico nativo da instalação com prompt copiável e aviso de novas releases Windows. As configurações ativas do plugin completo continuam sujeitas à validação; a seleção individual informa quando não herda hooks/MCP do plugin.
+
+Verificação local:
+
+- `npm run typecheck` e `npm test`: passaram, com **142 testes** e um teste nativo opt-in executado separadamente.
+- `npm run test:codex-local`: passou o ciclo isolado de catálogo, instalação, atualização, verificação do cache, recuperação e remoção. A configuração pessoal é capturada antes do diagnóstico e permaneceu byte a byte igual.
+- `npm run test:desktop`: **três testes passaram**, com o empacotado opt-in separado. Cobrem fluxo antigo, seleção interna/impedimentos/instalação/diagnóstico e retorno do Histórico para a origem correta. Um teste precisou aguardar o estado inicial visível antes de preencher o link; a regressão de Histórico passou também em três repetições consecutivas.
+- `npm run dist:win` e `npm run test:packaged`: NSIS gerado, executável empacotado 0.2.0-beta.1 aberto em perfil temporário, renderer sem Node, ponte isolada e Git detectado com PATH limitado a `Windows/System32`. Opções avançadas operáveis por teclado; sem rolagem horizontal na janela mínima.
+- Consulta real à API pública de releases: a produção identificou a beta.2 mais recente para uma versão antiga simulada, com URL exata do instalador deste projeto. As regressões cobrem ordem SemVer, betas, drafts, assets inválidos, URLs externas, limite de resposta e erro de rede. O aplicativo não instala atualizações automaticamente.
+
+Instalador local final: `release/beta-usability-final/Claude-to-Codex-0.2.0-beta.1-Windows-x64-Setup.exe`, 113.134.309 bytes, SHA-256 `dc6c45e4d5f36f55c06cea67c0b1358b9939f3884440a7f2a953e1fe0adbfb7b`, Authenticode `NotSigned`. O assistente NSIS não foi executado sobre a instalação pessoal. O download publicado é uma geração separada da CI.
+
+### Teste real pela nova seleção
+
+Origem UI UX Pro Max fixada em `7246805992a42b7bba37d4cac83b01416f0c6c44`. A interface apresentou **sete skills** e a principal foi escolhida sem preencher Pasta. O teste usou aquisição Git, IPC e adaptação assistida de produção, conta Codex autenticada e instalação em `CODEX_HOME` temporário.
+
+Relatório concluído: `.cache/uipro-assisted-EZogok/report.json`, ignorado pelo Git. Análise de 11,1 segundos e adaptação de 43,5 segundos nesta máquina. Pacote com **75 arquivos**, zero impedimentos, **71 recursos/licença** comparados por SHA-256. A seleção evita uma cópia redundante da licença do pacote anteriormente importado por pasta; a licença original permanece preservada. A identidade gerenciada da principal permanece `nextlevelbuilder-ui-ux-pro-max-16aa3cea`.
+
+**Verificar instalação** confirmou reconhecimento, ativação, origem gerenciada, todos os 75 arquivos esperados no cache nativo e Python 3.12.14. As três buscas revisadas foram executadas depois da instalação, nessa cópia nativa, com `-B`, sem persistência ou cache Python:
+
+| Busca real | Resultado |
+| --- | --- |
+| `SaaS dashboard analytics --design-system --json` | Data-Dense Dashboard, primária `#1E40AF`, Fira Code/Fira Sans |
+| `keyboard accessibility focus --domain ux --json` | 3 recomendações estruturadas |
+| `responsive form state accessibility --stack react --json` | 3 recomendações estruturadas |
+
+Na repetição sequencial, o SHA-256 da configuração pessoal permaneceu igual antes e nos cinco checkpoints: análise, conversão, instalação, verificação e buscas. A primeira execução, realizada em paralelo com outros diagnósticos nativos, passou na conversão, instalação, verificação e buscas, mas falhou na guarda do hash pessoal: `.cache/uipro-assisted-dCAEhP/report.json`. Não há evidência suficiente para atribuir aquela mudança a um processo específico; nenhum conteúdo pessoal foi revertido. A repetição sequencial e a guarda ampliada do teste nativo passaram. Os relatórios não armazenam o conteúdo da configuração pessoal.
+
+### Revisão e limites
+
+Revisão independente identificou quatro casos corrigidos com regressões: seleção da origem errada ao abrir outra conversão pelo Histórico, adaptação de um SKILL.md inativo dentro de assets, nome do prompt de teste diferente do nome anunciado no YAML e seleção de contexto auxiliar pelo nome anunciado. A releitura das correções não manteve achados críticos ou importantes.
+
+A aprovação funcional continua restrita à principal e às três consultas executadas. O pacote completo das sete skills não foi revalidado funcionalmente nesta rodada. Contexto adicional não confirma ferramentas, agentes externos ou MCPs na sessão de destino. O diagnóstico da instalação é distinto de um teste funcional: não executa código importado e só compara os arquivos esperados, sem atestar arquivos adicionais criados depois pelo Codex. macOS/Linux, assinatura de código e o assistente de instalação NSIS permanecem sem validação.

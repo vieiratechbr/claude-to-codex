@@ -12,12 +12,17 @@ import { OperationStore, atomicWrite } from '../core/store';
 import { CodexInstaller, saveBundle, loadBundle } from '../core/installer';
 import { assertOwnedPath } from '../core/paths';
 import { redact } from '../core/process';
+import { checkForAppUpdates } from '../core/updates';
+import type { AppUpdate } from '../shared/updates';
+import type { InstallationVerification } from '../shared/verification';
+import { APP_VERSION } from '../shared/version';
 interface ServiceContext {
   dataRoot: string; codexHome?: string; onProgress?: (event: ProgressEvent) => void;
   diagnose?: () => Promise<Diagnostics>; readSource?: (request: SourceRequest) => Promise<SourceSnapshot>;
+  updates?: () => Promise<AppUpdate>;
 }
 export function bundleView(bundle: ConversionBundle): BundleView {
-  return { id: bundle.id, pluginName: bundle.pluginName, sourceCommit: bundle.sourceCommit, source: bundle.source, findings: bundle.findings, installable: bundle.installable, files: bundle.files.map(f => ({ path: f.path, bytes: f.data.length, sha256: f.sha256 })) };
+  return { id: bundle.id, pluginName: bundle.pluginName, sourceCommit: bundle.sourceCommit, source: bundle.source, findings: bundle.findings, installable: bundle.installable, analysisId:bundle.analysisId, files: bundle.files.map(f => ({ path: f.path, bytes: f.data.length, sha256: f.sha256 })) };
 }
 export class AppService {
   readonly store: OperationStore; private active?: { id: string; controller: AbortController };
@@ -36,6 +41,7 @@ export class AppService {
     return this.diagnose();
   }
   async diagnose(): Promise<Diagnostics> { return this.context.diagnose ? this.context.diagnose() : diagnoseCodex(await this.settings()); }
+  async checkForUpdates(): Promise<AppUpdate> { return this.context.updates ? this.context.updates() : checkForAppUpdates(APP_VERSION); }
   private async job<T>(stage: string, action: (signal: AbortSignal, progress: (p: ProgressEvent) => void) => Promise<T>): Promise<T> {
     if (this.active) throw new Error('Aguarde ou cancele a operação em andamento.');
     const id = randomUUID(); const controller = new AbortController(); this.active = { id, controller };
@@ -54,7 +60,7 @@ export class AppService {
       const components = inventorySource(snapshot);
       if (!components.length) throw new Error('Nenhum plugin ou SKILL.md encontrado. Confira a pasta ou o formato do repositório.');
       await this.store.save({ id: snapshot.id, kind: 'analysis', state: 'ready', createdAt: new Date().toISOString(), title: request.url.replace('https://github.com/',''), data: { ...snapshot, files: snapshot.files.map(f => ({ ...f, data: f.data.toString('base64') })) } });
-      return { id: snapshot.id, request: snapshot.request, commit: snapshot.commit, warnings: snapshot.warnings, components: components.map(c => ({ id: c.id, kind: c.kind, root: c.root, name: c.name, fileCount: c.files.length, findings: c.findings })) };
+      return { id: snapshot.id, request: snapshot.request, commit: snapshot.commit, warnings: snapshot.warnings, components: components.map(c => ({ id: c.id, kind: c.kind, root: c.root, name: c.name, fileCount: c.files.length, findings: c.findings, parentPluginId: c.parentPluginId })) };
     });
   }
   async convert(analysisId: string, componentIds: string[], useCodex: boolean): Promise<BundleView[]> {
@@ -75,6 +81,19 @@ export class AppService {
   async install(id: string): Promise<InstallResult> {
     await loadBundle(this.store, id);
     return this.job('installation', async signal => (await this.installer(signal)).install(id));
+  }
+  async verifyInstallation(id: string): Promise<InstallationVerification> {
+    return this.job('verification',async signal => {
+      const record = await this.store.load(id); let installationId = id;
+      if (record?.kind === 'bundle') {
+        const installed = (await this.store.list()).find(item => item.kind === 'installation' && item.state === 'installed' && item.data.bundleId === id);
+        if (!installed) throw new Error('Instalação deste pacote não encontrada.');
+        installationId = installed.id;
+      }
+      const result = await (await this.installer(signal)).verify(installationId);
+      if (signal.aborted) throw new Error('Operação cancelada.');
+      return result;
+    });
   }
   async applyUpdate(installationId: string, bundleId: string): Promise<InstallResult> {
     return this.job('installation', async signal => (await this.installer(signal)).update(installationId, bundleId));

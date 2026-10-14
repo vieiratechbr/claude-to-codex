@@ -4,7 +4,7 @@ Aplicativo Windows com janela própria para importar skills e plugins do **Claud
 
 Cole um link do GitHub, selecione os componentes, revise os arquivos e instale. Inclui histórico local, comparação com a origem, exportação ZIP, atualização, remoção e recuperação. A instalação usa os comandos oficiais de plugins e o catálogo local do Codex.
 
-**Versão 0.1.2-beta.2 — em testes, ainda não estável.** Corrige a detecção do Git fora do PATH ao abrir o aplicativo pelo Windows. Inclui importação de repositórios reais com leitura de objetos em lote, links internos seguros e adaptação por skill. Interface com identificação visual de Claude Code e Codex, quatro etapas guiadas e opções avançadas recolhidas. Recursos sem equivalente aparecem como impedimentos e bloqueiam a instalação. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md).
+**Código-fonte 0.2.0-beta.1 — em testes, ainda não estável.** Permite escolher skills internas de um plugin, destaca impedimentos por arquivo, fornece referências relevantes à adaptação assistida, verifica instalações gerenciadas e consulta novas versões públicas. Recursos sem equivalente aparecem como impedimentos e bloqueiam a instalação. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md). O novo instalador está em validação; o download publicado abaixo corresponde à beta anterior.
 
 **[Baixar beta para Windows x64 — v0.1.2-beta.2](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.1.2-beta.2/Claude-to-Codex-0.1.2-beta.2-Windows-x64-Setup.exe)**
 
@@ -40,28 +40,34 @@ No PowerShell, use `npm.cmd` se a política bloquear `npm.ps1`.
 npm run dist:win
 ```
 
-Saída: `release/Claude-to-Codex-0.1.2-beta.2-Windows-x64-Setup.exe`. O instalador publicado é promovido do artifact da [verificação Windows](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38497222095), sem recompilar durante a publicação. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
+Saída: `release/Claude-to-Codex-0.2.0-beta.1-Windows-x64-Setup.exe`. A publicação promove o artifact de uma verificação Windows aprovada, sem recompilar durante a publicação. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
 
 ## Usar
 
 1. Abra o aplicativo e confira **Ambiente**.
 2. Cole uma URL de repositório, como `https://github.com/anthropics/skills`. Para escolher branch/commit ou pasta, abra **Opções avançadas** e preencha os campos separados, em vez de colar um link `tree/`.
 3. Clique em **Analisar repositório**. Os objetos Git são lidos sem executar scripts, checkout ou filtros da origem.
-4. Selecione skills/plugins. A conversão assistida envia as instruções selecionadas ao Codex; desative-a para usar apenas os adaptadores locais.
-5. Revise impedimentos, avisos e arquivos. Exporte um ZIP para inspeção externa.
+4. Selecione skills ou o plugin completo. As skills internas aparecem como escolhas individuais; selecionar uma desmarca o plugin completo. A conversão assistida envia as instruções selecionadas e trechos relevantes de referências ao Codex; desative-a para usar apenas os adaptadores locais.
+5. Revise impedimentos, avisos e arquivos. Os impedimentos mostram a skill ou o arquivo afetado. Use **Escolher skills separadamente** para rever um pacote com várias skills, ou exporte um ZIP para inspeção externa.
 6. Clique em **Instalar no Codex**. Cada pacote reconhecido passa a mostrar **Instalado no Codex**. A última etapa indica conclusão quando todos os pacotes desta conversão estão instalados. Abra uma nova conversa ou reinicie o Codex para carregar as alterações.
 
 Exemplo verificado: `https://github.com/anthropics/skills`, pasta `skills/frontend-design`; a revisão exata está em [VALIDATION.md](docs/VALIDATION.md). Revise instruções e recursos de terceiros antes de usá-los.
 
-Para **UI UX Pro Max**, use `https://github.com/nextlevelbuilder/ui-ux-pro-max-skill` e, em **Opções avançadas → Pasta**, `.claude/skills/ui-ux-pro-max`. Essa skill principal passou na conversão, instalação isolada e buscas de design, acessibilidade e React. O pacote completo reúne outras seis skills e ficou bloqueado por dependências e workflows auxiliares sem adaptação confirmada. Detalhes e revisão testada estão em [VALIDATION.md](docs/VALIDATION.md).
+Para **UI UX Pro Max**, use `https://github.com/nextlevelbuilder/ui-ux-pro-max-skill`, analise o repositório e marque **Skill: ui-ux-pro-max**. Você pode selecionar a principal entre as sete skills sem informar uma pasta. O campo **Opções avançadas → Pasta** continua disponível para importações específicas. A principal passou na conversão, instalação isolada e buscas de design, acessibilidade e React; isso não comprova os workflows das outras seis skills. Detalhes e revisão testada estão em [VALIDATION.md](docs/VALIDATION.md).
 
-No **Histórico**, abra uma conversão, prepare uma atualização para revisão, remova uma instalação gerenciada ou recupere uma operação. Uma origem fixada em commit continua fixada nas atualizações.
+Após instalar, use **Verificar instalação** na revisão ou no **Histórico**. O diagnóstico confere reconhecimento e ativação no CLI, origem gerenciada, versão e hashes dos arquivos no cache nativo; verifica Python 3 quando há scripts Python. O painel oferece um prompt para copiar e testar na sua sessão do Codex. Não executa scripts importados nem testa conexões MCP.
+
+No **Histórico**, abra uma conversão, prepare uma atualização para revisão, remova uma instalação gerenciada ou recupere uma operação. Uma origem fixada em commit continua fixada nas atualizações. Ao voltar à seleção de um pacote antigo, o aplicativo recupera a origem daquela conversão.
+
+O aplicativo consulta as releases públicas ao abrir e em **Ambiente → Consultar atualizações**, incluindo betas. Quando existe uma versão Windows mais recente, **Abrir download** abre o link do instalador no navegador. A atualização é manual; falhas nessa consulta não bloqueiam a conversão.
 
 ## Dados, conta e recuperação
 
 Dados ficam em `%APPDATA%/Claude to Codex`. O destino Codex usa `CODEX_HOME` ou `~/.codex`. Para um perfil alternativo do aplicativo, defina `CLAUDE_TO_CODEX_HOME` com caminho absoluto antes de abri-lo.
 
-A conversão assistida usa `codex exec`, schema, sandbox de leitura e ferramentas desativadas. Não materializa código da origem no workspace do modelo. Depende de rede, disponibilidade e limites da conta Codex.
+A conversão assistida usa `codex exec`, schema, sandbox de leitura e ferramentas desativadas. Não materializa código da origem no workspace do modelo. Além da skill ativa, envia até 16 trechos de recursos textuais relevantes, limitados a 24 KiB por trecho e 128 KiB no total, e um inventário limitado de caminhos. Esse contexto é somente leitura: o modelo pode editar apenas a skill ativa. Depende de rede, disponibilidade e limites da conta Codex.
+
+A consulta de atualizações usa a API pública de releases deste projeto, sem autenticação GitHub e sem enviar os dados das skills. Aceita links HTTPS de download e notas do próprio repositório.
 
 O catálogo gerenciado chama-se `claude-to-codex-local`. A ferramenta registra snapshots da configuração e do catálogo envolvidos. Recuperação compara o estado atual com o registrado; mudança externa gera conflito e preserva os arquivos atuais. Não apague os dados com recuperação pendente. **Limpar downloads** remove clones temporários e mantém histórico e recuperação.
 
@@ -81,7 +87,7 @@ npm run test:packaged
 
 Testes de instalação usam `CODEX_HOME` temporário. Testes comuns não exigem login nem rede. Veja [contribuição](docs/CONTRIBUTING.md), [arquitetura](docs/superpowers/specs/2026-10-13-claude-to-codex-design.md) e [plano](docs/superpowers/plans/2026-10-13-claude-to-codex.md). O mantenedor trabalha diretamente na **main**.
 
-O teste opcional `npm run test:ui-ux-pro-max` usa a revisão fixada do repositório `nextlevelbuilder/ui-ux-pro-max-skill`, a pasta principal, rede e sua conta Codex para adaptação. Instala somente em um perfil temporário e depois executa os scripts de busca convertidos com consultas de teste. Requer Python 3 no PATH, ou `C2C_QA_PYTHON` com o caminho do executável. O relatório fica em `.cache/uipro-assisted-*/report.json`. Use `C2C_QA_SCOPE=repository` para testar o pacote inteiro e `C2C_QA_SHOW_WINDOW=1` para acompanhar a janela e salvar screenshots. A skill importada também requer Python no computador de quem a utilizar.
+O teste opcional `npm run test:ui-ux-pro-max` usa a revisão fixada do repositório `nextlevelbuilder/ui-ux-pro-max-skill`, seleciona a principal pela interface, usa rede e sua conta Codex para adaptação. Instala somente em um perfil temporário, verifica a instalação e depois executa os scripts revisados de busca no cache nativo com consultas de teste. Requer Python 3 no PATH, ou `C2C_QA_PYTHON` com o caminho do executável. O relatório fica em `.cache/uipro-assisted-*/report.json`. Use `C2C_QA_SCOPE=repository` para testar o pacote inteiro e `C2C_QA_SHOW_WINDOW=1` para acompanhar a janela e salvar screenshots. A skill importada também requer Python no computador de quem a utilizar.
 
 ## Licença e referências
 

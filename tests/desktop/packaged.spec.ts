@@ -13,7 +13,7 @@ test('abre o executável empacotado com ponte isolada e perfil temporário', asy
     const page = await application.firstWindow();
     await expect(page.getByLabel('Link do GitHub')).toBeVisible();
     expect(await application.evaluate(({ app }) => app.isPackaged)).toBe(true);
-    expect(await application.evaluate(({ app }) => app.getVersion())).toBe('0.1.2-beta.2');
+    expect(await application.evaluate(({ app }) => app.getVersion())).toBe('0.2.0-beta.1');
     expect(await application.evaluate(({ app }) => app.getPath('userData'))).toContain(root);
     expect(await page.evaluate(() => typeof (window as any).require)).toBe('undefined');
     expect(await page.evaluate(() => typeof (window as any).claudeToCodex.analyze)).toBe('function');

@@ -10,6 +10,8 @@ const api: AppApi = {
   diagnose: () => invoke('diagnose'), settings: () => invoke('settings'),
   analyze: value => invoke('analyze',value), convert: value => invoke('convert',value),
   install: id => invoke('install',id), prepareUpdate: value => invoke('prepareUpdate',value), applyUpdate: value => invoke('applyUpdate',value),
+  verifyInstallation: id => invoke('verifyInstallation',id), checkForUpdates: () => invoke('checkForUpdates'), openAppUpdate: url => invoke('openAppUpdate',url),
+  copyText: text => invoke('copyText',text),
   remove: id => invoke('remove',id), restore: id => invoke('restore',id), listHistory: () => invoke('listHistory'), reviewBundle: id => invoke('reviewBundle',id),
   preview: value => invoke('preview',value), exportBundle: id => invoke('exportBundle',id),
   selectCodexExecutable: () => invoke('selectCodexExecutable'), openDataFolder: () => invoke('openDataFolder'),

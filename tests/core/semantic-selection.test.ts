@@ -14,7 +14,15 @@ it('envia apenas skills ativas para o modelo e preserva cópias inativas do repo
     expect(request.files.map(f => f.path)).toEqual(['skills/design/SKILL.md']);
     return { files: request.files.map(f => ({ ...f, content: f.content.replace('Claude Code', 'Codex') })), findings: [] };
   });
-  const [bundle] = await convertComponents(input, inventorySource(input).map(c => c.id), { useCodex: true, dataRoot: 'unused', diagnostics: { authenticated: false, capabilities: { exec: false, pluginAdd: true, marketplaceAdd: true, pluginListJson: true, isolatedConversion: false }, findings: [] } });
+  const [bundle] = await convertComponents(input, inventorySource(input).filter(c => !c.parentPluginId).map(c => c.id), { useCodex: true, dataRoot: 'unused', diagnostics: { authenticated: false, capabilities: { exec: false, pluginAdd: true, marketplaceAdd: true, pluginListJson: true, isolatedConversion: false }, findings: [] } });
   expect(bundle.installable).toBe(true);
   expect(bundle.files.find(f => f.path.startsWith('cli/'))?.data.toString()).toBe('Claude Code CLI template; keep this original copy.');
+});
+it('preserva SKILL.md de template dentro dos assets sem torná-lo editável',async()=>{
+  const original='Claude Code template original; not an active skill.';
+  const input:SourceSnapshot={id:'nested',request:{url:'https://github.com/acme/design.git'},commit:'a'.repeat(40),warnings:[],files:Object.entries({'.claude-plugin/plugin.json':'{"name":"design"}','skills/design/SKILL.md':'Use Claude Code to design.','skills/design/assets/template/SKILL.md':original}).map(([path,text])=>({path,data:Buffer.from(text),mode:'100644',oid:''}))};
+  vi.mocked(adaptWithCodex).mockImplementation(async request=>({files:request.files.map(file=>({path:file.path,content:'---\nname: design\ndescription: Design\n---\nUse portable design guidance.'})),findings:[]}));
+  const [bundle]=await convertComponents(input,[inventorySource(input).find(c=>c.kind==='plugin')!.id],{useCodex:true,dataRoot:'unused',diagnostics:{authenticated:true,capabilities:{exec:true,pluginAdd:true,marketplaceAdd:true,pluginListJson:true,isolatedConversion:true},findings:[]}});
+  expect(vi.mocked(adaptWithCodex).mock.calls.at(-1)![0].files.map(file=>file.path)).toEqual(['skills/design/SKILL.md']);
+  expect(bundle.files.find(file=>file.path==='skills/design/assets/template/SKILL.md')?.data.toString()).toBe(original);
 });

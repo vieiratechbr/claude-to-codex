@@ -11,7 +11,7 @@ import { promisify } from 'node:util';
 import { validateDesignSearch } from './qa-design-results.mjs';
 const run = promisify(execFile);
 const commit = '7246805992a42b7bba37d4cac83b01416f0c6c44';
-const scope = process.env.C2C_QA_SCOPE || '.claude/skills/ui-ux-pro-max';
+const scope = process.env.C2C_QA_SCOPE || 'selection';
 await mkdir('.cache', { recursive: true });
 const root = await mkdtemp(join(process.cwd(), '.cache/uipro-assisted-'));
 const config = join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'config.toml');
@@ -19,6 +19,9 @@ const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const fingerprint = async () => { try { return hash(await readFile(config)); } catch (e) { if (e.code === 'ENOENT') return null; throw e; } };
 const before = await fingerprint();
 const report = { root, sourceCommit: commit, scope, completed: false };
+report.personalConfigBefore = before;
+report.personalConfigStages = [];
+const checkpoint = async stage => report.personalConfigStages.push({stage,sha256:await fingerprint(),at:new Date().toISOString()});
 await build({ entryPoints: ['tests/helpers/real-repository-window.ts'], outfile: 'dist/main/real-repository-window.cjs', bundle: true, platform: 'node', format: 'cjs', target: 'node24', external: ['electron'] });
 const env = { ...process.env, C2C_REAL_TEST_ROOT: root }; delete env.ELECTRON_RUN_AS_NODE;
 const application = await _electron.launch({ args: ['dist/main/real-repository-window.cjs'], cwd: process.cwd(), env });
@@ -31,17 +34,22 @@ try {
   await page.getByLabel('Link do GitHub').fill('https://github.com/nextlevelbuilder/ui-ux-pro-max-skill');
   await page.getByText('Opções avançadas', { exact: true }).click();
   await page.getByLabel('Referência').fill(commit);
-  if (scope !== 'repository') await page.getByLabel('Pasta', { exact: false }).fill(scope);
+  if (!['repository','selection'].includes(scope)) await page.getByLabel('Pasta', { exact: false }).fill(scope);
   const started = Date.now();
   await page.getByRole('button', { name: 'Analisar repositório', exact: true }).click();
   console.log(JSON.stringify({ root, phase: 'real-analysis' }));
   await page.getByRole('heading', { name: 'Escolha os componentes' }).waitFor({ state: 'visible', timeout: 180000 });
   report.analysisMs = Date.now() - started;
+  await checkpoint('analysis');
+  if (scope === 'selection') await page.getByRole('checkbox', { name: 'Skill: ui-ux-pro-max', exact: true }).check();
+  if (scope === 'repository') await page.getByRole('checkbox', { name: 'Plugin completo: ui-ux-pro-max', exact: true }).check();
+  report.skillChoices = await page.getByRole('checkbox', { name: /^Skill: / }).count();
   await screenshot('selection.png');
   const conversionStarted = Date.now();
   await page.getByRole('button', { name: 'Converter selecionados', exact: true }).click();
   await page.getByRole('heading', { name: 'Revise a conversão' }).waitFor({ state: 'visible', timeout: 2100000 });
   report.conversionMs = Date.now() - conversionStarted;
+  await checkpoint('conversion');
   const history = await page.evaluate(() => window.claudeToCodex.listHistory());
   const bundleRecord = history.find(h => h.kind === 'bundle');
   const bundle = await page.evaluate(id => window.claudeToCodex.reviewBundle(id), bundleRecord.id);
@@ -55,6 +63,13 @@ try {
   await page.getByText('Instalação reconhecida pelo Codex.', { exact: true }).waitFor({ state: 'visible', timeout: 120000 });
   await screenshot('installed.png');
   report.recognized = true;
+  await checkpoint('installation');
+  await page.getByRole('button', { name:'Verificar instalação', exact:true }).click();
+  await page.getByRole('heading', { name:'Verificação da instalação',exact:true }).waitFor({timeout:60000});
+  if (await page.getByText('Falhou',{exact:true}).count()) throw new Error('Native installation verification failed.');
+  report.verification = await page.locator('.verification-checks .finding').allTextContents();
+  await checkpoint('verification');
+  await screenshot('verification.png');
   const installed = join(root, 'marketplace/plugins', bundle.id);
   const analysisRecord = history.find(h => h.kind === 'analysis');
   const original = JSON.parse(await readFile(join(root, 'records', analysisRecord.id + '.json'), 'utf8')).data;
@@ -64,7 +79,8 @@ try {
     const source = originalFiles.get(file.sourcePath);
     if (!source || hash(Buffer.from(source.data, 'base64')) !== file.sha256) throw new Error('Conversion changed a resource: ' + file.path);
   }
-  const script = join(installed, 'skills/ui-ux-pro-max/scripts/search.py');
+  const nativeInstalled = join(root,'codex-home/plugins/cache/claude-to-codex-local',bundle.pluginName,'0.1.0');
+  const script = join(nativeInstalled, 'skills/ui-ux-pro-max/scripts/search.py');
   const python = process.env.C2C_QA_PYTHON || 'python';
   report.searches = [];
   for (const args of [
@@ -84,6 +100,7 @@ try {
     report.preservedFiles++;
   }
   report.personalConfigUnchanged = await fingerprint() === before;
+  await checkpoint('searches');
   if (!report.personalConfigUnchanged) throw new Error('Personal Codex configuration changed.');
   report.completed = true;
   report.progress = await page.evaluate(() => window.__qaProgress);

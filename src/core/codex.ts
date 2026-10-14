@@ -16,9 +16,12 @@ export async function findExecutable(name: string, manual?: string): Promise<str
       for (const root of gitRoots) candidates.push(join(root, 'cmd', 'git.exe'), join(root, 'bin', 'git.exe'));
       candidates.push(join(homedir(), '.cache', 'codex-runtimes', 'codex-primary-runtime', 'dependencies', 'native', 'git', 'cmd', 'git.exe'));
     }
+    if (name === 'python' || name === 'python3') candidates.push(join(homedir(), '.cache', 'codex-runtimes', 'codex-primary-runtime', 'dependencies', 'python', 'python.exe'));
+    if (name === 'py') candidates.push(join(process.env.SystemRoot || 'C:\\Windows','py.exe'),join(localAppData,'Programs','Python','Launcher','py.exe'));
   }
   for (const file of new Set(candidates)) {
     if (['.cmd', '.bat'].includes(extname(file).toLowerCase())) continue;
+    if (['python','python3','py'].includes(name) && /[\\/]Microsoft[\\/]WindowsApps[\\/]/i.test(file)) continue;
     try { if ((await stat(file)).isFile()) return file; } catch {}
   }
 }

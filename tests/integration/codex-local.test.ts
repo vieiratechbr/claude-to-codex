@@ -8,10 +8,11 @@ import { OperationStore } from '../../src/core/store';
 import { digest } from '../../src/core/conversion';
 import type { ConversionBundle } from '../../src/shared/contracts';
 it.skipIf(process.env.C2C_NATIVE_TEST !== '1')('instala, atualiza, recupera e remove usando o Codex real isolado', async () => {
-  const diagnostic = await diagnoseCodex();
-  expect(diagnostic.capabilities.pluginListJson).toBe(true);
   const personal = join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'config.toml');
   const original = await readFile(personal).catch(() => null);
+  const diagnostic = await diagnoseCodex();
+  expect(diagnostic.capabilities.pluginListJson).toBe(true);
+  expect(await readFile(personal).catch(() => null)).toEqual(original);
   const root = await mkdtemp(join(tmpdir(), 'c2c-native-'));
   try {
     const dataRoot = process.platform === 'win32' ? join(root, 'data').toUpperCase() : join(root, 'data'); const home = join(root, 'home'); await mkdir(home);
@@ -25,7 +26,9 @@ it.skipIf(process.env.C2C_NATIVE_TEST !== '1')('instala, atualiza, recupera e re
     }
     const installer = new CodexInstaller({ dataRoot, codexPath: diagnostic.codexPath!, codexHome: home });
     const first = await installer.install('native-one'); expect(first.state, JSON.stringify(first.findings)).toBe('installed'); expect(first.recognized).toBe(true);
+    expect((await installer.verify(first.installationId!)).checks.every(check => check.status === 'passed')).toBe(true);
     const updated = await installer.update(first.installationId!, 'native-two'); expect(updated.state).toBe('updated');
+    expect((await installer.verify(first.installationId!)).checks.every(check => check.status === 'passed')).toBe(true);
     const restored = await installer.restore(updated.operationId); expect(restored.state).toBe('restored'); expect(restored.recognized).toBe(true);
     const removed = await installer.remove(first.installationId!); expect(removed.state).toBe('removed'); expect(removed.recognized).toBe(false);
     expect(await readFile(personal).catch(() => null)).toEqual(original);

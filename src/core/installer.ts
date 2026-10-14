@@ -10,6 +10,9 @@ import { assertOwnedPath, safeJoin } from './paths';
 import { checkedProcess } from './process';
 import { snapshotFile, restoreFile } from './recovery';
 import { provenance } from './provenance';
+import { verifyBundleFiles, findPython } from './verification';
+import type { InstallationVerification, VerificationCheck } from '../shared/verification';
+import {markdownMetadata} from './inventory';
 export const MARKETPLACE = 'claude-to-codex-local';
 export interface InstallerContext { dataRoot: string; codexPath: string; codexHome?: string; signal?: AbortSignal; run?: (args: string[]) => Promise<any> }
 interface StateSnapshot { config: string|null; catalog: string|null }
@@ -121,6 +124,44 @@ export class CodexInstaller {
     return list.installed.some((p: any) => p.pluginId === name + '@' + MARKETPLACE && p.installed === true);
   }
   async install(bundleId: string): Promise<InstallResult> { return this.perform('install', bundleId); }
+    async verify(installationId: string): Promise<InstallationVerification> {
+      const record = await this.store.load(installationId);
+      if (!record || record.kind !== 'installation' || record.state !== 'installed') throw new Error('Instalação gerenciada não encontrada.');
+      const bundle = await loadBundle(this.store,record.data.bundleId);
+      if (record.title !== bundle.pluginName || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(record.title)) throw new Error('Identidade da instalação inválida.');
+      const pluginId = record.title + '@' + MARKETPLACE; const checks: VerificationCheck[] = [];
+      let entry: any;
+      try {
+        const list = await this.run(['plugin','list','--marketplace',MARKETPLACE,'--json']);
+        if (!Array.isArray(list?.installed)) throw new Error('Resposta do CLI inválida.');
+        entry = list.installed.find((item: any) => item.pluginId === pluginId && item.installed === true);
+        checks.push({key:'recognized',label:'Reconhecimento no Codex',status:entry ? 'passed' : 'failed',detail:entry ? pluginId : 'O CLI não confirmou esta instalação.'});
+      } catch (error) { checks.push({key:'recognized',label:'Reconhecimento no Codex',status:'failed',detail:(error as Error).message}); }
+      const recognized = Boolean(entry), enabled = entry?.enabled === true;
+      if (entry) {
+        checks.push({key:'enabled',label:'Ativação',status:enabled ? 'passed' : 'failed',detail:enabled ? 'Plugin ativado no Codex.' : 'O CLI não confirmou que o plugin está ativado. Confira o plugin no Codex.'});
+        const pathKey = (path: string) => { const value = resolve(path.replace(/^\\\\\?\\/,'')); return process.platform === 'win32' ? value.toLowerCase() : value; };
+        const expectedSource = join(this.catalogRoot,'plugins',bundle.id);
+        const sameSource = entry.source?.source === 'local' && typeof entry.source.path === 'string' && pathKey(entry.source.path) === pathKey(expectedSource);
+        checks.push({key:'source',label:'Origem gerenciada',status:sameSource ? 'passed' : 'failed',detail:sameSource ? 'O plugin aponta para o pacote gerenciado pelo aplicativo.' : 'A origem nativa difere da instalação registrada.'});
+        const manifest = bundle.files.find(file => file.path === '.codex-plugin/plugin.json');
+        const version = manifest && JSON.parse(manifest.data.toString()).version;
+        if (typeof version !== 'string' || !/^[0-9A-Za-z][0-9A-Za-z.+-]{0,80}$/.test(version) || entry.version !== version) checks.push({key:'files',label:'Arquivos no cache nativo',status:'failed',detail:'Versão do pacote nativo diferente da versão registrada.'});
+        else {
+          const ownedRoot = join(this.home,'plugins','cache'); const cacheRoot = join(ownedRoot,MARKETPLACE,record.title,version);
+          const integrity = await verifyBundleFiles(bundle.files,cacheRoot,ownedRoot);
+          checks.push({key:'files',label:'Arquivos no cache nativo',status:integrity.status,detail:integrity.status === 'passed' ? `${integrity.checkedFiles} arquivos conferidos por SHA-256.` : `${integrity.checkedFiles}/${bundle.files.length} arquivos conferidos. ${integrity.problems.join(' · ')}`});
+        }
+      }
+      if (bundle.files.some(file => /\.py$/i.test(file.path))) {
+        const python = await findPython();
+        checks.push({key:'python',label:'Python para os scripts incluídos',status:python.path ? 'passed' : 'warning',detail:python.path ? `${python.version} · ${python.path}` : 'Python 3 não encontrado nas localizações verificadas. Selecione um Python disponível na sessão antes de usar os scripts.'});
+      }
+      if (bundle.files.some(file => file.path === '.mcp.json')) checks.push({key:'mcp',label:'Integrações externas',status:'warning',detail:'Conexões MCP, credenciais e serviços externos não são testados por esta verificação.'});
+      const skillNames = bundle.files.filter(file => /^skills\/[^/]+\/SKILL\.md$/.test(file.path)).map(file => {try{const name=markdownMetadata(file.data.toString()).name;if(typeof name==='string'&&/^[a-z0-9][a-z0-9-]{0,59}$/.test(name))return name;}catch{}return file.path.split('/')[1];});
+      const testPrompt = skillNames.length ? `Use a skill $${skillNames[0]}. Leia o SKILL.md instalado, confira seus recursos e dependências e proponha um teste funcional pequeno. Informe quais comandos serão necessários antes de executá-los. Ao executar o teste autorizado, mostre o comando e o resultado real; se um recurso faltar, informe o erro exato.` : undefined;
+      return {installationId,pluginId,recognized,enabled,checkedAt:new Date().toISOString(),checks,testPrompt};
+    }
   async update(installationId: string, bundleId: string): Promise<InstallResult> { return this.perform('update', bundleId, installationId); }
   async remove(installationId: string): Promise<InstallResult> { return this.perform('remove', undefined, installationId); }
   private async perform(action: Transaction['action'], bundleId?: string, installationId?: string): Promise<InstallResult> {
