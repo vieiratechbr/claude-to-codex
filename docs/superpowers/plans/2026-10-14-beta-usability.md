@@ -25,3 +25,9 @@ Testar pela janela: selecionar skills dentro do plugin, evitar sobreposição, c
 ## 6. Entrega
 
 Executar typecheck, suíte completa, Codex nativo isolado, desktop, NSIS e janela empacotada. Revisão independente do diff completo; corrigir achados materiais com regressões. Commits por etapa na main, publicação por API GitHub com lease (sem force push), CI Windows e release prerelease do artifact verificado. Conferir download público e SHA-256, registrar evidências. Nenhuma instalação de teste no perfil pessoal.
+
+## Execução concluída em 14/10/2026
+
+Cinco melhorias implementadas; tipos, 142 testes, integração Codex isolada, três fluxos desktop, NSIS e janela empacotada aprovados. Revisão independente corrigida com regressões. A primeira CI revelou a comparação de caminhos equivalentes; correção adicional e CI `38512075020` aprovadas. Publicação `38512551091` promoveu o artifact verificado para a beta `v0.2.0-beta.1`. Download anônimo, SHA-256 e atualização pela API pública conferidos. Evidências e limites em [VALIDATION.md](../../VALIDATION.md).
+
+Commits na main: `22665952aba5632b082856372361a70d2f6382b3` (melhorias), `a7291bd13500ae27f4a13a230b2120d91e913728` (caminhos nativos), `b9a499a6f286f78fff94fbfe5a9949adfccf7f82` (publicação). Nenhuma branch alternativa, worktree ou force push.
