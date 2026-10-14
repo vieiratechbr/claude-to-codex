@@ -26,9 +26,9 @@ it.skipIf(process.env.C2C_NATIVE_TEST !== '1')('instala, atualiza, recupera e re
     }
     const installer = new CodexInstaller({ dataRoot, codexPath: diagnostic.codexPath!, codexHome: home });
     const first = await installer.install('native-one'); expect(first.state, JSON.stringify(first.findings)).toBe('installed'); expect(first.recognized).toBe(true);
-    expect((await installer.verify(first.installationId!)).checks.every(check => check.status === 'passed')).toBe(true);
+    expect((await installer.verify(first.installationId!)).checks.filter(check => check.status !== 'passed')).toEqual([]);
     const updated = await installer.update(first.installationId!, 'native-two'); expect(updated.state).toBe('updated');
-    expect((await installer.verify(first.installationId!)).checks.every(check => check.status === 'passed')).toBe(true);
+    expect((await installer.verify(first.installationId!)).checks.filter(check => check.status !== 'passed')).toEqual([]);
     const restored = await installer.restore(updated.operationId); expect(restored.state).toBe('restored'); expect(restored.recognized).toBe(true);
     const removed = await installer.remove(first.installationId!); expect(removed.state).toBe('removed'); expect(removed.recognized).toBe(false);
     expect(await readFile(personal).catch(() => null)).toEqual(original);

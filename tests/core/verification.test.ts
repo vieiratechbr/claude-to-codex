@@ -56,12 +56,18 @@ it('confere ativação nativa e mantém registros e arquivos de configuração i
   const store = new OperationStore(dataRoot); await saveBundle(store,bundle);
   const record = { id:'install',kind:'installation' as const,state:'installed',title:'fixture',createdAt:new Date().toISOString(),data:{bundleId:'bundle'} };
   await store.save(record); await writeFile(join(home,'config.toml'),'# preserve this file');
+  const stage = join(dataRoot,'marketplace','plugins','bundle'); await mkdir(stage,{recursive:true});
+  const sourceAlias = join(root,'source-alias'); await symlink(stage,sourceAlias,process.platform === 'win32' ? 'junction' : 'dir');
   const native = { installed: [{ pluginId:'fixture@claude-to-codex-local',installed:true,enabled:false,version:'0.1.0',source:{source:'local',path:join(dataRoot,'marketplace','plugins','bundle')} }] };
   const installer = new CodexInstaller({dataRoot,codexHome:home,codexPath:'unused',run:async args => { expect(args).toEqual(['plugin','list','--marketplace','claude-to-codex-local','--json']); return native; }});
   const result = await installer.verify('install');
   expect(result.recognized).toBe(true); expect(result.enabled).toBe(false);
   expect(result.checks.find(check => check.key === 'enabled')?.status).toBe('failed');
   expect(result.checks.find(check => check.key === 'files')?.status).toBe('passed');
+  native.installed[0].source.path=sourceAlias;
+  expect((await installer.verify('install')).checks.find(check=>check.key==='source')?.status).toBe('passed');
+  native.installed[0].source.path=join(root,'missing-source');
+  expect((await installer.verify('install')).checks.find(check=>check.key==='source')?.status).toBe('failed');
   expect(result.testPrompt).toContain('$advertised-demo');
   expect(await store.load('install')).toEqual(record);
   expect(await readFile(join(home,'config.toml'),'utf8')).toBe('# preserve this file');

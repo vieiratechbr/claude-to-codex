@@ -140,9 +140,9 @@ export class CodexInstaller {
       const recognized = Boolean(entry), enabled = entry?.enabled === true;
       if (entry) {
         checks.push({key:'enabled',label:'Ativação',status:enabled ? 'passed' : 'failed',detail:enabled ? 'Plugin ativado no Codex.' : 'O CLI não confirmou que o plugin está ativado. Confira o plugin no Codex.'});
-        const pathKey = (path: string) => { const value = resolve(path.replace(/^\\\\\?\\/,'')); return process.platform === 'win32' ? value.toLowerCase() : value; };
         const expectedSource = join(this.catalogRoot,'plugins',bundle.id);
-        const sameSource = entry.source?.source === 'local' && typeof entry.source.path === 'string' && pathKey(entry.source.path) === pathKey(expectedSource);
+        let sameSource = false;
+        try { sameSource = entry.source?.source === 'local' && typeof entry.source.path === 'string' && canonicalPath(entry.source.path) === canonicalPath(expectedSource); } catch {}
         checks.push({key:'source',label:'Origem gerenciada',status:sameSource ? 'passed' : 'failed',detail:sameSource ? 'O plugin aponta para o pacote gerenciado pelo aplicativo.' : 'A origem nativa difere da instalação registrada.'});
         const manifest = bundle.files.find(file => file.path === '.codex-plugin/plugin.json');
         const version = manifest && JSON.parse(manifest.data.toString()).version;
