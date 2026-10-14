@@ -1,0 +1,70 @@
+name: Publish verified v0.1.2 beta.2
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-v0.1.2-beta.2.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: publish-v0.1.2-beta.2
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: vieiratechbr/claude-to-codex
+      RELEASE_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify successful build and unchanged application
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/$GH_REPO/actions/runs/38497222095 > build.json
+          jq -e '.conclusion == "success" and .head_branch == "main" and .head_sha == "24816b52e76a8c29325a22576357e7761dd9ca36"' build.json
+          gh api repos/$GH_REPO/actions/artifacts/11864172888 > artifact.json
+          jq -e '.name == "Windows-installer" and .expired == false and .workflow_run.id == 38497222095 and .digest == "sha256:f6eecdd031caa57f547229b802cd1a0ba016f9cdef479cbdc9682d22f1e859d4"' artifact.json
+          git diff --exit-code 24816b52e76a8c29325a22576357e7761dd9ca36 HEAD -- src package.json package-lock.json scripts electron-builder.yml '*.config.ts' tests
+      - uses: actions/download-artifact@v4
+        with:
+          name: Windows-installer
+          path: release-assets
+          github-token: ${{ github.token }}
+          repository: vieiratechbr/claude-to-codex
+          run-id: 38497222095
+      - name: Prepare checksums and beta notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f release-assets/Claude-to-Codex-0.1.2-beta.2-Windows-x64-Setup.exe
+          (cd release-assets && sha256sum Claude-to-Codex-0.1.2-beta.2-Windows-x64-Setup.exe > SHA256SUMS.txt)
+          cp docs/releases/v0.1.2-beta.2.md release-notes.md
+          printf '\n## SHA-256 do instalador publicado\n\n```text\n' >> release-notes.md
+          cat release-assets/SHA256SUMS.txt >> release-notes.md
+          printf '```\n' >> release-notes.md
+      - name: Publish beta and preserve existing downloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v0.1.2-beta.2 --json isDraft,isPrerelease,targetCommitish > existing-release.json 2>/dev/null; then
+            if jq -e '.isDraft == false and .isPrerelease == true' existing-release.json >/dev/null; then
+              test "$(gh api repos/$GH_REPO/git/ref/tags/v0.1.2-beta.2 --jq .object.sha)" = "$RELEASE_COMMIT"
+              echo 'Beta already published; preserving existing assets.'
+            else
+              jq -e --arg commit "$RELEASE_COMMIT" '.isDraft == true and .targetCommitish == $commit' existing-release.json
+              gh release upload v0.1.2-beta.2 release-assets/Claude-to-Codex-0.1.2-beta.2-Windows-x64-Setup.exe release-assets/SHA256SUMS.txt --clobber
+              gh release edit v0.1.2-beta.2 --draft=false --prerelease --latest=false --notes-file release-notes.md
+            fi
+          else
+            gh release create v0.1.2-beta.2 --target "$RELEASE_COMMIT" --title 'Claude to Codex v0.1.2-beta.2 — Windows' --notes-file release-notes.md --draft --prerelease
+            gh release upload v0.1.2-beta.2 release-assets/Claude-to-Codex-0.1.2-beta.2-Windows-x64-Setup.exe release-assets/SHA256SUMS.txt
+            gh release edit v0.1.2-beta.2 --draft=false --prerelease --latest=false
+          fi
+          gh release view v0.1.2-beta.2 --json url,isDraft,isPrerelease,assets
