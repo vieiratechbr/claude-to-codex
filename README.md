@@ -4,11 +4,11 @@ Aplicativo Windows com janela própria para importar skills e plugins do **Claud
 
 Cole um link do GitHub, selecione os componentes, revise os arquivos e instale. Inclui histórico local, comparação com a origem, exportação ZIP, atualização, remoção e recuperação. A instalação usa os comandos oficiais de plugins e o catálogo local do Codex.
 
-**Código-fonte 0.3.0-beta.1 — em testes, ainda não estável.** Reúne as skills selecionadas em uma instalação, cria uma chamada para escolher e combinar as adequadas à tarefa e mostra chamadas copiáveis no Histórico. Inclui novo visual do instalador, link do projeto e opção **Apoiar github**. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md). A nova beta está em validação; o download abaixo corresponde à versão anterior.
+**Beta pública 0.3.0-beta.1 — em testes, ainda não estável.** Reúne as skills selecionadas em uma instalação, cria uma chamada para escolher e combinar as adequadas à tarefa e mostra chamadas copiáveis no Histórico. Inclui novo visual do instalador, link do projeto e opção **Apoiar github**. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md).
 
-**[Baixar beta para Windows x64 — v0.2.0-beta.1](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.2.0-beta.1/Claude-to-Codex-0.2.0-beta.1-Windows-x64-Setup.exe)**
+**[Baixar beta para Windows x64 — v0.3.0-beta.1](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.3.0-beta.1/Claude-to-Codex-0.3.0-beta.1-Windows-x64-Setup.exe)**
 
-Download direto, sem precisar compilar ou acessar artifacts de CI. A [release v0.2.0-beta.1](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.2.0-beta.1) inclui requisitos, notas e [checksum SHA-256](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.2.0-beta.1/SHA256SUMS.txt). Instalador por usuário, sem assinatura digital. [Ver todas as versões](https://github.com/vieiratechbr/claude-to-codex/releases).
+Download direto, sem precisar compilar ou acessar artifacts de CI. A [release v0.3.0-beta.1](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.3.0-beta.1) inclui requisitos, notas e [checksum SHA-256](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.3.0-beta.1/SHA256SUMS.txt). Instalador por usuário, sem assinatura digital. [Ver todas as versões](https://github.com/vieiratechbr/claude-to-codex/releases).
 
 ![Janela do aplicativo](docs/images/application.png)
 
