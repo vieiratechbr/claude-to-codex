@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="164" height="314" viewBox="0 0 164 314">
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#213629"/><stop offset="1" stop-color="#101514"/></linearGradient>
+    <linearGradient id="codex" x2="0" y2="1"><stop stop-color="#c4acff"/><stop offset=".5" stop-color="#6e8bff"/><stop offset="1" stop-color="#4438f4"/></linearGradient>
+  </defs>
+  <rect width="164" height="314" fill="url(#bg)"/>
+  <path d="M125-20 200 55M96-20 200 84M-30 274l75 75M-30 245l104 104" stroke="#40583e" opacity=".45"/>
+  <g font-family="Segoe UI, sans-serif">
+    <rect x="18" y="19" width="111" height="21" rx="10" fill="#324b35"/>
+    <circle cx="30" cy="29.5" r="2.5" fill="#b5d5a2"/>
+    <text x="39" y="33" fill="#d4e3c9" font-size="9" font-weight="600" letter-spacing=".7">LOCAL · WINDOWS</text>
+    <text x="18" y="73" fill="#f1efe6" font-size="25" font-weight="600" letter-spacing="-.5">Claude</text>
+    <text x="18" y="102" fill="#efb487" font-size="25" font-weight="600" letter-spacing="-.5">to Codex</text>
+    <path d="M18 120h128" stroke="#59704c"/>
+    <g transform="translate(24 146) scale(1.55)" fill="#e59a6b" shape-rendering="crispEdges">
+      <path d="M6 3h16v3h3v10h-3v2H6v-2H3V6h3V3ZM0 8h3v6H0V8Zm25 0h3v6h-3V8ZM6 18h3v4H6v-4Zm5 0h3v3h-3v-3Zm4 0h3v3h-3v-3Zm5 0h3v4h-3v-4Z"/>
+      <path d="M9 8h3v4H9V8Zm8 0h3v4h-3V8Z" fill="#231d19"/>
+    </g>
+    <path d="M78 163h13m-5-5 5 5-5 5" stroke="#b7cda2" stroke-width="1.5" fill="none"/>
+    <g transform="translate(102 144) scale(.69)">
+      <path d="M20 12C22 3 35 1 42 8C54 5 63 17 58 28C65 40 59 51 48 53C45 64 29 65 21 57C8 60 1 47 6 37C-1 26 6 15 20 12Z" fill="url(#codex)" stroke="#98a3ff"/>
+      <path d="m21 24 6 10-6 10M36 43h12" stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </g>
+    <text x="24" y="209" fill="#d4e3c9" font-size="11">Suas skills.</text>
+    <text x="24" y="225" fill="#d4e3c9" font-size="11">No seu Codex.</text>
+    <path d="M18 258h128" stroke="#3b5140"/>
+    <text x="18" y="280" fill="#bdcaae" font-size="10">Seu workflow, outro destino.</text>
+    <text x="18" y="297" fill="#93a687" font-size="9">por vieiratechbr</text>
+  </g>
+</svg>

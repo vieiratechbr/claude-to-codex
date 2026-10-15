@@ -16,13 +16,14 @@ import { checkForAppUpdates } from '../core/updates';
 import type { AppUpdate } from '../shared/updates';
 import type { InstallationVerification } from '../shared/verification';
 import { APP_VERSION } from '../shared/version';
+import {skillCalls} from '../core/skill-calls';
 interface ServiceContext {
   dataRoot: string; codexHome?: string; onProgress?: (event: ProgressEvent) => void;
   diagnose?: () => Promise<Diagnostics>; readSource?: (request: SourceRequest) => Promise<SourceSnapshot>;
   updates?: () => Promise<AppUpdate>;
 }
 export function bundleView(bundle: ConversionBundle): BundleView {
-  return { id: bundle.id, pluginName: bundle.pluginName, sourceCommit: bundle.sourceCommit, source: bundle.source, findings: bundle.findings, installable: bundle.installable, analysisId:bundle.analysisId, files: bundle.files.map(f => ({ path: f.path, bytes: f.data.length, sha256: f.sha256 })) };
+  return { id: bundle.id, pluginName: bundle.pluginName, sourceCommit: bundle.sourceCommit, source: bundle.source, findings: bundle.findings, installable: bundle.installable, analysisId:bundle.analysisId,invocations:skillCalls(bundle.files,bundle.entrySkill),entrySkill:bundle.entrySkill, files: bundle.files.map(f => ({ path: f.path, bytes: f.data.length, sha256: f.sha256 })) };
 }
 export class AppService {
   readonly store: OperationStore; private active?: { id: string; controller: AbortController };
@@ -63,11 +64,11 @@ export class AppService {
       return { id: snapshot.id, request: snapshot.request, commit: snapshot.commit, warnings: snapshot.warnings, components: components.map(c => ({ id: c.id, kind: c.kind, root: c.root, name: c.name, fileCount: c.files.length, findings: c.findings, parentPluginId: c.parentPluginId })) };
     });
   }
-  async convert(analysisId: string, componentIds: string[], useCodex: boolean): Promise<BundleView[]> {
+  async convert(analysisId: string, componentIds: string[], useCodex: boolean,asPackage=false,packageEntry?:string): Promise<BundleView[]> {
     return this.job('conversion', async (signal, onProgress) => {
       const record = await this.store.load(analysisId); if (!record || record.kind !== 'analysis') throw new Error('Análise não encontrada.');
       const snapshot = { ...record.data, files: record.data.files.map((f: any) => ({ ...f, data: Buffer.from(f.data,'base64') })) } as SourceSnapshot;
-      const bundles = await convertComponents(snapshot, componentIds, { dataRoot: this.context.dataRoot, diagnostics: await this.diagnose(), useCodex, signal, onProgress });
+      const bundles = await convertComponents(snapshot, componentIds, { dataRoot: this.context.dataRoot, diagnostics: await this.diagnose(), useCodex, signal, onProgress,asPackage,packageEntry });
       if (signal.aborted) throw new Error('Operação cancelada.');
       for (const bundle of bundles) await saveBundle(this.store, bundle);
       return bundles.map(bundleView);
@@ -101,8 +102,10 @@ export class AppService {
   async prepareUpdate(id: string, useCodex: boolean): Promise<BundleView[]> {
     const record = await this.store.load(id); if (!record || record.kind !== 'installation' || record.state !== 'installed') throw new Error('Instalação não encontrada.');
     const analysis = await this.analyze(record.data.source);
-    if (!analysis.components.some(c => c.id === record.data.componentId)) throw new Error('O componente mudou de localização. Faça uma nova análise e confira a migração.');
-    const views = await this.convert(analysis.id, [record.data.componentId], useCodex);
+    const componentIds=record.data.groupAll===true?analysis.components.filter(c=>c.kind==='skill').map(c=>c.id):record.data.componentIds||[record.data.componentId];
+    if (!componentIds.length||componentIds.some((id:string)=>!analysis.components.some(c=>c.id===id))) throw new Error('O componente mudou de localização. Faça uma nova análise e confira a migração.');
+    const previous=record.data.asPackage===true&&typeof record.data.bundleId==='string'?await loadBundle(this.store,record.data.bundleId):undefined;
+    const views = await this.convert(analysis.id, componentIds, useCodex,record.data.asPackage===true,previous?.entrySkill);
     const updated: BundleView[] = [];
     for (const view of views) {
       const bundle = await loadBundle(this.store, view.id);
@@ -131,7 +134,13 @@ export class AppService {
     return { text: binary ? 'Arquivo binário. Exporte o pacote para inspecionar.' : file.data.subarray(0,100000).toString(), original, binary, truncated };
   }
   async listHistory(): Promise<HistoryView[]> {
-    return (await this.store.list()).map(r => ({ id: r.id, kind: r.kind, title: r.title, state: r.state, createdAt: r.createdAt, source: r.kind === 'transaction' ? undefined : r.data?.source || r.data?.request, sourceCommit: r.data?.sourceCommit || r.data?.commit }));
+    const records=await this.store.list();const bundles=new Map(records.filter(r=>r.kind==='bundle').map(r=>[r.id,r]));
+    return records.map(r=>{
+      const bundle=r.kind==='bundle'?r:r.kind==='installation'?bundles.get(r.data?.bundleId):undefined;
+      const files=Array.isArray(bundle?.data?.files)?bundle.data.files.filter((f:any)=>typeof f?.path==='string'&&/^skills\/[^/]+\/SKILL\.md$/.test(f.path)&&typeof f?.data==='string'&&f.data.length<2800000).map((f:any)=>({path:f.path,data:Buffer.from(f.data,'base64')})):[];
+      const invocations=skillCalls(files,bundle?.data?.entrySkill);const entrySkill=typeof bundle?.data?.entrySkill==='string'&&invocations.includes('$'+bundle.data.entrySkill)?bundle.data.entrySkill:undefined;
+      return {id:r.id,kind:r.kind,title:r.title,state:r.state,createdAt:r.createdAt,source:r.kind==='transaction'?undefined:r.data?.source||r.data?.request,sourceCommit:r.data?.sourceCommit||r.data?.commit,invocations,entrySkill};
+    });
   }
   async reviewBundle(id: string): Promise<BundleView> { return bundleView(await loadBundle(this.store,id)); }
   async cleanDownloads(): Promise<void> {

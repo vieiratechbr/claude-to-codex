@@ -1,6 +1,6 @@
 import {test,expect,_electron} from '@playwright/test';
 import {build} from 'esbuild';
-import {mkdtemp,mkdir} from 'node:fs/promises';
+import {mkdtemp,mkdir,readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 test('skills internas, impedimentos, verificação local e aviso de atualização',async () => {
   await mkdir('.cache',{recursive:true}); const root=await mkdtemp(join(process.cwd(),'.cache/usability-'));
@@ -51,5 +51,38 @@ test('revisão no Histórico escolhe skills da origem correta quando há outra a
     await page.locator('article.history-row').filter({has:page.getByText(other.pluginName,{exact:true})}).getByRole('button',{name:'Revisar',exact:true}).click();
     await page.getByRole('button',{name:'Escolher skills separadamente',exact:true}).click();
     await expect(page.getByText('acme/other',{exact:true})).toBeVisible();
+  }finally{await app.close();}
+});
+
+test('pacote seleciona todas as skills e expõe chamadas copiáveis no Histórico',async()=>{
+  await mkdir('.cache',{recursive:true});const root=await mkdtemp(join(process.cwd(),'.cache/package-ui-'));
+  await build({entryPoints:['tests/helpers/desktop-fixture.ts'],outfile:'dist/main/fixture.cjs',bundle:true,platform:'node',format:'cjs',target:'node24',external:['electron']});
+  const env=Object.fromEntries(Object.entries(process.env).filter((entry):entry is [string,string]=>typeof entry[1]==='string'));
+  env.C2C_FIXTURE_ROOT=root;env.C2C_FIXTURE_NESTED='1';env.CODEX_HOME=join(root,'codex-home');delete env.ELECTRON_RUN_AS_NODE;
+  const app=await _electron.launch({args:['dist/main/fixture.cjs'],cwd:process.cwd(),env});
+  try{
+    const page=await app.firstWindow();
+    await page.getByLabel('Link do GitHub').fill('https://github.com/acme/fixture');
+    await page.getByRole('button',{name:'Analisar repositório',exact:true}).click();
+    await expect(page.getByRole('checkbox',{name:'Skill: teste-ui',exact:true})).toBeChecked();
+    await expect(page.getByRole('checkbox',{name:'Skill: other',exact:true})).toBeChecked();
+    await expect(page.getByRole('checkbox',{name:'Instalar como pacote',exact:false})).toBeChecked();
+    await page.getByLabel('Usar o Codex na adaptação').uncheck();
+    await page.getByRole('button',{name:'Converter selecionados',exact:true}).click();
+    await expect(page.getByText('Chamada do pacote',{exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Instalar no Codex',exact:false}).click();
+    await page.getByRole('button',{name:'Verificar instalação',exact:true}).click();
+    await expect(page.getByLabel('Prompt para testar a skill')).toHaveValue(/\$acme-fixture/);
+    await page.getByRole('button',{name:'Histórico',exact:false}).click();
+    const installed=page.locator('article.history-row').filter({has:page.getByText('Instalado',{exact:true})});
+    await installed.getByRole('button',{name:'Copiar $acme-fixture',exact:true}).click();
+    await expect(installed.getByRole('status')).toHaveText('$acme-fixture copiado.');
+    expect(await readFile(join(root,'copied-call.txt'),'utf8')).toBe('$acme-fixture');
+    await installed.getByText('2 chamadas individuais',{exact:true}).click();
+    await installed.getByRole('button',{name:'Copiar $teste-ui',exact:true}).click();
+    expect(await readFile(join(root,'copied-call.txt'),'utf8')).toBe('$teste-ui');
+    await page.setViewportSize({width:900,height:700});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+    await page.screenshot({path:'test-results/package-history.png'});
   }finally{await app.close();}
 });

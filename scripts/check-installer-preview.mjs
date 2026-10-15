@@ -1,0 +1,14 @@
+import {createRequire} from 'node:module';
+import {mkdtemp,mkdir,writeFile} from 'node:fs/promises';
+import {join} from 'node:path';
+import {spawnSync} from 'node:child_process';
+if(process.platform!=='win32')throw new Error('NSIS preview requires Windows.');
+const require=createRequire(import.meta.url);
+const {getMakeNsisPath}=require('app-builder-lib/out/toolsets/windows');
+const compiler=await getMakeNsisPath();
+await mkdir('.cache',{recursive:true});
+const root=await mkdtemp(join(process.cwd(),'.cache','installer-preview-'));
+await writeFile(join(root,'events.log'),'');
+const result=spawnSync(compiler.path,['/V2',`/DPROJECT_DIR=${process.cwd()}`,`/DC2C_PREVIEW_ROOT=${root}`,'tests/helpers/installer-preview.nsi'],{env:{...process.env,...compiler.env},windowsHide:true,encoding:'utf8'});
+if(result.status!==0)throw new Error(result.stdout+'\n'+result.stderr);
+console.log(JSON.stringify({root,executable:join(root,'installer-preview.exe'),events:join(root,'events.log'),installsSoftware:false}));

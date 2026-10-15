@@ -4,7 +4,7 @@ export interface SourceFile { path: string; mode: string; oid: string; data: Buf
 export interface SourceSnapshot { id: string; request: SourceRequest; commit: string; files: SourceFile[]; warnings: string[] }
 export interface SourceComponent { id: string; kind: 'skill'|'plugin'; root: string; name: string; files: string[]; findings: Finding[]; manifest?: Record<string,unknown>; parentPluginId?: string }
 export interface BundleFile { path: string; data: Buffer; sha256: string; sourcePath?: string }
-export interface ConversionBundle { id: string; pluginName: string; sourceCommit: string; files: BundleFile[]; findings: Finding[]; installable: boolean; source: SourceRequest; componentId: string; analysisId?: string }
+export interface ConversionBundle { id: string; pluginName: string; sourceCommit: string; files: BundleFile[]; findings: Finding[]; installable: boolean; source: SourceRequest; componentId: string; analysisId?: string; componentIds?:string[]; asPackage?:boolean; groupAll?:boolean; entrySkill?:string }
 export interface ProgressEvent { operationId: string; stage: string; message: string; completed?: number; total?: number }
 export interface Diagnostics {
   gitPath?: string; codexPath?: string; gitVersion?: string; codexVersion?: string; authenticated: boolean;
@@ -14,6 +14,6 @@ export interface Diagnostics {
 export interface SourceLimits { maxFiles: number; maxFileBytes: number; maxTotalBytes: number }
 export interface SourceContext { dataRoot: string; gitPath: string; signal?: AbortSignal; onProgress?: (p: ProgressEvent) => void }
 export const SOURCE_LIMITS: SourceLimits = { maxFiles: 20000, maxFileBytes: 2 * 1024 * 1024, maxTotalBytes: 64 * 1024 * 1024 };
-export interface ConversionOptions { useCodex: boolean; diagnostics: Diagnostics; dataRoot: string; signal?: AbortSignal; onProgress?: (p: ProgressEvent) => void }
+export interface ConversionOptions { useCodex: boolean; diagnostics: Diagnostics; dataRoot: string; signal?: AbortSignal; onProgress?: (p: ProgressEvent) => void; asPackage?:boolean; packageEntry?:string }
 export interface SemanticResult { files: { path: string; content: string }[]; findings: Finding[] }
 export interface InstallResult { operationId: string; installationId?: string; state: 'installed'|'updated'|'removed'|'restored'|'conflict'|'failed'; recognized: boolean; findings: Finding[] }

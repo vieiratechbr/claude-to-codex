@@ -3,13 +3,13 @@ import type { InstallationVerification } from './verification';
 import type { AppUpdate } from './updates';
 export interface ComponentView { id: string; kind: 'skill'|'plugin'; root: string; name: string; fileCount: number; findings: Finding[]; parentPluginId?: string }
 export interface AnalysisView { id: string; request: SourceRequest; commit: string; components: ComponentView[]; warnings: string[] }
-export interface BundleView { id: string; pluginName: string; sourceCommit: string; source: SourceRequest; findings: Finding[]; installable: boolean; analysisId?: string; files: { path: string; bytes: number; sha256: string }[] }
-export interface HistoryView { id: string; kind: string; title: string; state: string; createdAt: string; source?: SourceRequest; sourceCommit?: string }
+export interface BundleView { id: string; pluginName: string; sourceCommit: string; source: SourceRequest; findings: Finding[]; installable: boolean; analysisId?: string; invocations?:string[]; entrySkill?:string; files: { path: string; bytes: number; sha256: string }[] }
+export interface HistoryView { id: string; kind: string; title: string; state: string; createdAt: string; source?: SourceRequest; sourceCommit?: string; invocations?:string[]; entrySkill?:string }
 export interface AppApi {
   diagnose(): Promise<Diagnostics>;
   settings(): Promise<{ dataRoot: string; codexHome: string; codexPath?: string }>;
   analyze(input: SourceRequest): Promise<AnalysisView>;
-  convert(input: { analysisId: string; componentIds: string[]; useCodex: boolean }): Promise<BundleView[]>;
+  convert(input: { analysisId: string; componentIds: string[]; useCodex: boolean; asPackage?:boolean }): Promise<BundleView[]>;
   install(id: string): Promise<InstallResult>;
   verifyInstallation(id: string): Promise<InstallationVerification>;
   checkForUpdates(): Promise<AppUpdate>;

@@ -10,6 +10,7 @@ files:
   - LICENSE
 asar: true
 win:
+  icon: build/installer/app-icon.ico
   target:
     - target: nsis
       arch: [x64]
@@ -22,3 +23,10 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   runAfterFinish: true
+  installerLanguages: [pt_BR]
+  include: build/installer/custom.nsh
+  installerIcon: build/installer/app-icon.ico
+  uninstallerIcon: build/installer/app-icon.ico
+  installerHeader: build/installer/header.bmp
+  installerSidebar: build/installer/sidebar.bmp
+  uninstallerSidebar: build/installer/sidebar.bmp

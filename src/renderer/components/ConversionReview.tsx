@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { BundleView } from '../../shared/api';
+import {SkillCalls} from './SkillCalls';
 export function ConversionReview({ bundles, busy, install, update, installedIds, verify, chooseSkills }: { bundles: BundleView[]; busy: boolean; install: (id: string) => void; update: boolean; installedIds: string[]; verify: (id:string) => void; chooseSkills: (bundle:BundleView) => void }) {
   const [active,setActive] = useState(bundles[0]?.id); const bundle = bundles.find(b => b.id === active) || bundles[0];
   const [path,setPath] = useState(''); const [preview,setPreview] = useState<{ text: string; original?: string; binary: boolean; truncated: boolean }>(); const [previewError,setPreviewError] = useState(''); const [diff,setDiff] = useState(false);
@@ -20,6 +21,7 @@ export function ConversionReview({ bundles, busy, install, update, installedIds,
     <h2>Revise a conversão</h2><p className="muted">Confira os arquivos e as adaptações antes de adicionar o pacote ao Codex.</p>
     {bundles.length > 1 && <div className="bundle-tabs">{bundles.map(b => <button className={bundle.id === b.id ? 'active' : ''} onClick={() => setActive(b.id)} key={b.id}>{b.pluginName}</button>)}</div>}
     <div className="package-heading"><strong>{bundle.pluginName}</strong><span>{bundle.files.length} arquivos · origem {bundle.sourceCommit.slice(0,10)}</span></div>
+    <SkillCalls calls={bundle.invocations||[]} entrySkill={bundle.entrySkill} installed={isInstalled}/>
     {blockers.length > 0 && <div className="blocker-summary"><strong>Impedimentos para instalar</strong><p>{blockers.length} impedimento(s) · {warnings} aviso(s). Confira os componentes afetados abaixo.</p>{bundle.files.filter(file => /^skills\/[^/]+\/SKILL\.md$/.test(file.path)).length > 1 && <button className="secondary small" disabled={busy} onClick={() => chooseSkills(bundle)}>Escolher skills separadamente</button>}<div className="findings" aria-label="Impedimentos">{blockers.map(findingView)}</div></div>}
     {remaining.length > 0 && <details className="review-notes"><summary>{warnings} aviso(s) · {remaining.length - warnings} informação(ões)</summary><div className="findings">{remaining.map(findingView)}</div></details>}
     <div className="files-layout"><div className="file-list"><span className="eyebrow">ARQUIVOS DO PACOTE</span>{bundle.files.slice(0,250).map(file => <button className={file.path === path ? 'active' : ''} onClick={() => setPath(file.path)} key={file.path}><span aria-hidden="true">▤</span>{file.path}</button>)}{bundle.files.length > 250 && <small>Mais arquivos disponíveis no pacote exportado.</small>}</div>

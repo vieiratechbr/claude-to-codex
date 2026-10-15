@@ -4,7 +4,7 @@ Aplicativo Windows com janela própria para importar skills e plugins do **Claud
 
 Cole um link do GitHub, selecione os componentes, revise os arquivos e instale. Inclui histórico local, comparação com a origem, exportação ZIP, atualização, remoção e recuperação. A instalação usa os comandos oficiais de plugins e o catálogo local do Codex.
 
-**Versão 0.2.0-beta.1 — em testes, ainda não estável.** Permite escolher skills internas de um plugin, destaca impedimentos por arquivo, fornece referências relevantes à adaptação assistida, verifica instalações gerenciadas e consulta novas versões públicas. Recursos sem equivalente aparecem como impedimentos e bloqueiam a instalação. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md).
+**Código-fonte 0.3.0-beta.1 — em testes, ainda não estável.** Reúne as skills selecionadas em uma instalação, cria uma chamada para escolher e combinar as adequadas à tarefa e mostra chamadas copiáveis no Histórico. Inclui novo visual do instalador, link do projeto e opção **Apoiar github**. Consulte [compatibilidade](docs/COMPATIBILITY.md) e [validação](docs/VALIDATION.md). A nova beta está em validação; o download abaixo corresponde à versão anterior.
 
 **[Baixar beta para Windows x64 — v0.2.0-beta.1](https://github.com/vieiratechbr/claude-to-codex/releases/download/v0.2.0-beta.1/Claude-to-Codex-0.2.0-beta.1-Windows-x64-Setup.exe)**
 
@@ -21,6 +21,8 @@ Download direto, sem precisar compilar ou acessar artifacts de CI. A [release v0
 - Internet para baixar repositórios e usar o modelo. Repositórios privados dependem das credenciais Git já configuradas na máquina.
 
 O instalador inclui o runtime do aplicativo. Não inclui Git, Codex ou dependências dos plugins importados.
+
+A tela final mantém **Iniciar o aplicativo** e oferece **Apoiar github**, desmarcado inicialmente. Ao marcar o apoio e concluir, o instalador abre [o repositório do projeto](https://github.com/vieiratechbr/claude-to-codex) no navegador. O link também pode ser aberto diretamente nessa tela; deixar uma estrela é uma ação manual no GitHub.
 
 ## Executar e empacotar
 
@@ -40,14 +42,14 @@ No PowerShell, use `npm.cmd` se a política bloquear `npm.ps1`.
 npm run dist:win
 ```
 
-Saída: `release/Claude-to-Codex-0.2.0-beta.1-Windows-x64-Setup.exe`. O instalador publicado é promovido do artifact da [verificação Windows aprovada](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38512075020), sem recompilar durante a publicação. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
+Saída: `release/Claude-to-Codex-0.3.0-beta.1-Windows-x64-Setup.exe`. A publicação promove o artifact de uma verificação Windows aprovada, sem recompilar durante a publicação. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
 
 ## Usar
 
 1. Abra o aplicativo e confira **Ambiente**.
 2. Cole uma URL de repositório, como `https://github.com/anthropics/skills`. Para escolher branch/commit ou pasta, abra **Opções avançadas** e preencha os campos separados, em vez de colar um link `tree/`.
 3. Clique em **Analisar repositório**. Os objetos Git são lidos sem executar scripts, checkout ou filtros da origem.
-4. Selecione skills ou o plugin completo. As skills internas aparecem como escolhas individuais; selecionar uma desmarca o plugin completo. A conversão assistida envia as instruções selecionadas e trechos relevantes de referências ao Codex; desative-a para usar apenas os adaptadores locais.
+4. As skills encontradas já vêm selecionadas, com **Instalar como pacote** marcado. Um conjunto de várias skills vira uma instalação e recebe uma chamada como `$autor-repositorio`. Você pode retirar skills da seleção ou desmarcar o agrupamento para instalar individualmente. Selecionar um plugin completo desmarca suas skills internas. A conversão assistida envia instruções e referências ao Codex; desative-a para usar apenas os adaptadores locais.
 5. Revise impedimentos, avisos e arquivos. Os impedimentos mostram a skill ou o arquivo afetado. Use **Escolher skills separadamente** para rever um pacote com várias skills, ou exporte um ZIP para inspeção externa.
 6. Clique em **Instalar no Codex**. Cada pacote reconhecido passa a mostrar **Instalado no Codex**. A última etapa indica conclusão quando todos os pacotes desta conversão estão instalados. Abra uma nova conversa ou reinicie o Codex para carregar as alterações.
 
@@ -58,6 +60,10 @@ Para **UI UX Pro Max**, use `https://github.com/nextlevelbuilder/ui-ux-pro-max-s
 Após instalar, use **Verificar instalação** na revisão ou no **Histórico**. O diagnóstico confere reconhecimento e ativação no CLI, origem gerenciada, versão e hashes dos arquivos no cache nativo; verifica Python 3 quando há scripts Python. O painel oferece um prompt para copiar e testar na sua sessão do Codex. Não executa scripts importados nem testa conexões MCP.
 
 No **Histórico**, abra uma conversão, prepare uma atualização para revisão, remova uma instalação gerenciada ou recupere uma operação. Uma origem fixada em commit continua fixada nas atualizações. Ao voltar à seleção de um pacote antigo, o aplicativo recupera a origem daquela conversão.
+
+O **Histórico** e a revisão mostram a chamada anunciada em cada SKILL.md, com **Copiar**. Nos conjuntos, a chamada do pacote fica em destaque; as individuais ficam em uma lista expansível. Exemplo: `$autor-repositorio Crie um formulário acessível`. A skill de entrada consulta o catálogo, lê e combina as skills pertinentes e informa quais escolheu. Depois de instalar, abra uma nova conversa no Codex e selecione a skill sugerida ao digitar `$`.
+
+Na atualização de um pacote que incluiu todas as skills, novas skills encontradas na origem também entram na revisão. Uma seleção parcial mantém os componentes escolhidos; se algum mudou de localização, será necessária nova análise. O agrupamento preserva impedimentos de compatibilidade. Plugins completos diferentes devem ser convertidos separadamente; para juntar skills deles, selecione suas skills internas.
 
 O aplicativo consulta as releases públicas ao abrir e em **Ambiente → Consultar atualizações**, incluindo betas. Quando existe uma versão Windows mais recente, **Abrir download** abre o link do instalador no navegador. A atualização é manual; falhas nessa consulta não bloqueiam a conversão.
 

@@ -179,3 +179,33 @@ Após a correção, tipos, 142 testes, ciclo nativo isolado, build, três fluxos
 Download público sem autenticação confirmado: instalador com 113.134.308 bytes, SHA-256 `7a06253871c3b43904d9c273b9846c854fa27dc3aea6a9e80fb3b4a3ce145bd8`, igual ao `SHA256SUMS.txt` e ao digest do asset GitHub `639237652`; Authenticode `NotSigned`. Relatório local `.cache/download-beta-usability/report.json`. O instalador da CI e a geração local têm hashes diferentes. Nenhum instalador NSIS foi executado sobre o aplicativo pessoal.
 
 A consulta de atualizações de produção foi repetida após publicar: detectou `0.2.0-beta.1` como disponível para `0.1.2-beta.2` e retornou estado atual para `0.2.0-beta.1`, com os links exatos da nova release e do instalador. São consultas públicas sem token; a beta anterior não possui este updater e precisa ser atualizada manualmente.
+
+## Build intermediário 0.2.0-beta.2 — apresentação do instalador (não publicado)
+
+Solicitação do mantenedor: melhorar o visual e, na conclusão, manter **Iniciar o aplicativo**, mostrar o link do projeto e acrescentar **Apoiar github**. O destino aprovado é `https://github.com/vieiratechbr/claude-to-codex`. Apoio desmarcado por padrão; marcar e concluir abre o navegador para essa página. Estrela e login permanecem ações manuais do usuário.
+
+NSIS personalizado com ícone do cubo/seta, lateral baseada nos vetores já usados pelo aplicativo, cabeçalho próprio, fundo claro, fonte Segoe UI e textos em português. Usa os hooks oficiais do electron-builder e controles MUI nativos, preservando a função de iniciar o app e seu argumento de atualização. Identificador do aplicativo, instalação por usuário e ciclo de atualização não foram alterados.
+
+Verificação local em 14/10/2026:
+
+- Tipos e **142 testes** passaram; núcleo da conversão e instalação sem alterações funcionais nesta beta.
+- `node scripts/check-installer-preview.mjs` compilou uma prévia das mesmas macros de boas-vindas/conclusão. Não tem payload, registros, atalhos ou instalação. A função de abertura é substituída por um log somente nessa fixture.
+- Inspeção nativa confirmou leitura dos textos, link completo, ambas as caixas, **Iniciar o aplicativo** marcado e **Apoiar github** desmarcado. A conclusão no estado padrão escreveu somente `preview-app|` no log, sem URL GitHub: `.cache/installer-preview-jJTCHE/events.log`. Foi corrigida a codificação UTF-8 do título da fixture com BOM; a recompilação passou.
+- A automação de janela foi interrompida pelo usuário com Esc antes do teste com apoio marcado; nenhum novo comando de mouse/teclado foi emitido por Computer Use depois da interrupção. Não há afirmação de teste interativo da abertura real do navegador ou instalação sobre o app pessoal. A CI compila a prévia sem executá-la.
+- Build e NSIS final passaram. `release/installer-design-final/Claude-to-Codex-0.2.0-beta.2-Windows-x64-Setup.exe`, 113.282.517 bytes, SHA-256 `49dc8214dda5ab4fc7a4a207963fceb5a224560095e357694d8b7409237a53f6`, Authenticode `NotSigned`.
+
+Os SVGs, BMPs e ícones estão em `build/installer`; sua geração não baixa fontes/imagens. A prévia e os scripts de desenvolvimento não são distribuídos no ASAR. O assistente NSIS não foi executado sobre a instalação pessoal. macOS/Linux e assinatura digital permanecem sem validação.
+
+## Beta 0.3.0-beta.1 — chamadas e pacotes de skills
+
+Conferência local em 14/10/2026. Incorpora o instalador acima, Histórico com chamadas copiáveis e agrupamento das skills selecionadas em uma instalação. O comportamento aprovado da entrada é escolher e combinar skills pertinentes à tarefa.
+
+- Tipos e **150 testes** passaram. A origem artificial de 74 skills produziu um pacote com as 74 skills e uma entrada, preservando licença e referência cruzada. Há regressões para atualização com novas skills, seleção parcial, nomes YAML repetidos, nomes de pastas repetidos entre plugins, redução do conjunto para uma skill e registros antigos do Histórico.
+- O ciclo com Codex real isolado passou: instalação de duas skills com entrada, verificação de hashes, atualização para três skills, recuperação da seleção anterior e remoção. A configuração pessoal foi capturada antes do diagnóstico e permaneceu igual.
+- Quatro fluxos desktop passaram; o teste empacotado fica opt-in separado. O novo fluxo comprova seleção inicial de todas as skills, uma instalação, prompt com chamada do pacote e cópia da entrada e chamada individual no Histórico, sem rolagem horizontal a 900 pixels. Na fixture, a cópia escreve um arquivo temporário em vez de alterar a área de transferência pessoal.
+- Avaliação independente da entrada gerada: para formulário acessível com validação TypeScript, leu catálogo e as duas skills pertinentes, combinou rótulos/foco/teclado com validação tipada e respeitou o pedido de não enviar dados. As skills de banco e vídeo não foram lidas. Exemplo avaliado conceitualmente, sem execução: `.cache/skill-package-forward`. Essa evidência não atesta cada skill externa.
+- Revisão independente encontrou colisão de destinos entre pastas homônimas e perda da chamada após redução do conjunto. Ambas foram reproduzidas e corrigidas com regressões. A atualização preserva a entrada; um novo conflito de nome exige revisão da migração.
+
+A sintaxe `$nome` é documentada no [App Server oficial](https://learn.chatgpt.com/docs/app-server). A exibição deriva do nome YAML instalado; para nomes presentes em plugins diferentes, selecione a sugestão correspondente do Codex. O nome não confirma execução funcional. O agrupamento mantém impedimentos, requisitos e permissões da origem. A publicação Windows e seu download serão registrados após a CI.
+
+Build NSIS e janela empacotada passaram. Instalador local `release/Claude-to-Codex-0.3.0-beta.1-Windows-x64-Setup.exe`: 113.284.481 bytes, SHA-256 `2f418ce7ac0d7ad2b4b0b8bc85093de3c0fd13946599bfc2dba5343074a90d8d`, Authenticode `NotSigned`. ASAR com versão correta e MIT preservada; sem fixtures ou scripts de QA do projeto. A prévia nativa foi recompilada sem instalação. O teste interativo de apoio marcado continua incompleto após o cancelamento por Esc, conforme registro acima. Nenhum NSIS foi instalado sobre o app pessoal.

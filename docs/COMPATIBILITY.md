@@ -1,4 +1,4 @@
-# Compatibilidade 0.2.0-beta.1
+# Compatibilidade 0.3.x
 
 | Origem | Resultado | Limite |
 | --- | --- | --- |
@@ -6,6 +6,7 @@
 | .claude-plugin/plugin.json | .codex-plugin/plugin.json | Campos ativos desconhecidos bloqueiam instalação |
 | Vários plugins/skills e marketplace local | Seleção explícita e composição de manifests | Fontes externas aparecem bloqueadas para importação separada |
 | Skills ativas dentro de plugin | Escolhas individuais, com recursos e referências necessários | A seleção individual não herda silenciosamente hooks/MCP do plugin; dependências de componentes não selecionados podem bloquear |
+| Conjunto de skills selecionadas | Uma instalação com skill de entrada e catálogo | Escolhe e combina conforme a tarefa; nomes individuais repetidos no pacote bloqueiam |
 | Diretórios customizados | Recursos remapeados | Caminhos perigosos e arquivos ausentes recusados |
 | Commands Markdown/inline | Skills invocáveis | Sintaxe de slash commands não é garantida |
 | Agents Markdown | Skills com aviso | Não equivale a um subagente autônomo |

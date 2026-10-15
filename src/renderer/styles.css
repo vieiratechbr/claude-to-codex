@@ -156,3 +156,11 @@ h2 { font-size: 26px; }
 .verification textarea { width:100%; box-sizing:border-box; resize:vertical; border:1px solid #516347; border-radius:6px; background:#101714; color:#d6e0ca; padding:12px; font:12px/1.7 Consolas,monospace; }
 .verification textarea:focus-visible,.review-notes>summary:focus-visible { outline:2px solid #b2c795; outline-offset:3px; }
 .settings-note>button { margin-top:14px; }
+.skill-calls { display:flex; flex-direction:column; gap:8px; min-width:0; margin:12px 0; }
+.skill-call-list { display:flex; flex-wrap:wrap; gap:8px; }
+.skill-call { display:inline-flex; align-items:center; gap:8px; width:fit-content; max-width:100%; padding:5px 9px; border:1px solid #526747; border-radius:7px; background:#243225; }
+.skill-call code { font:13px/1.5 Consolas,monospace; color:#ead2b5; overflow-wrap:anywhere; user-select:all; }
+.skill-call button { flex-shrink:0; padding:5px 7px; }
+.skill-calls summary { color:#b7cda2; font-size:13px; cursor:pointer; margin-bottom:9px; }
+.skill-calls small { color:#b2bea7; font-size:12px; }
+@media(max-width:1100px) { .history-row { flex-wrap:wrap; align-items:flex-start; } .history-copy { flex-basis:240px; } .history-actions { margin-left:46px; flex-shrink:1; } }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { AnalysisView, BundleView, HistoryView } from '../shared/api';
 import type { Diagnostics, ProgressEvent, InstallResult } from '../shared/contracts';
 import { SourceForm } from './components/SourceForm';
-import { ComponentPicker } from './components/ComponentPicker';
+import { ComponentPicker,defaultSelection } from './components/ComponentPicker';
 import { ConversionReview } from './components/ConversionReview';
 import { History } from './components/History';
 import { Diagnostics as Environment } from './components/Diagnostics';
@@ -19,6 +19,7 @@ export function App() {
   const [bundles,setBundles] = useState<BundleView[]>([]); const [history,setHistory] = useState<HistoryView[]>([]);
   const [installedBundles,setInstalledBundles] = useState<string[]>([]);
   const [busy,setBusy] = useState(false); const [assisted,setAssisted] = useState(true);
+  const [asPackage,setAsPackage]=useState(true);
   const [error,setError] = useState(''); const [notice,setNotice] = useState(''); const [progress,setProgress] = useState<ProgressEvent>();
   const [verification,setVerification] = useState<InstallationVerification>();
   const [appUpdate,setAppUpdate] = useState<AppUpdate>(); const [updateDismissed,setUpdateDismissed] = useState(false);
@@ -54,8 +55,8 @@ export function App() {
         {verification&&<VerificationPanel key={verification.checkedAt} result={verification} close={()=>setVerification(undefined)}/>}
         {tab === 'convert' && <div className="conversion-stack">
           {bundles.length ? <><div className="back-row"><button className="quiet small" disabled={busy} onClick={() => chooseSkills(bundles[0],false)}>← Voltar à seleção</button><button className="quiet small" disabled={busy} onClick={() => { setBundles([]); setAnalysis(undefined); setUpdateTarget(undefined); }}>Nova origem ↗</button></div><ConversionReview key={bundles[0].id} bundles={bundles} busy={busy} installedIds={installedBundles} update={Boolean(updateTarget)} verify={verify} chooseSkills={chooseSkills} install={id => run(async () => { const result = updateTarget ? await api.applyUpdate({ installationId: updateTarget, bundleId: id }) : await api.install(id); installed(result); if (result.recognized && (result.state === 'installed' || result.state === 'updated')) setInstalledBundles(previous => [...new Set([...previous,id])]); })}/></>
-          : analysis ? <><div className="back-row"><button className="quiet small" disabled={busy} onClick={() => setAnalysis(undefined)}>← Outra origem</button><span className="muted small">{analysis.request.url.replace('https://github.com/','').replace(/\.git$/,'')}</span></div><ComponentPicker analysis={analysis} selected={selected} change={setSelected} assisted={assisted} setAssisted={setAssisted} busy={busy} convert={() => run(async () => setBundles(await api.convert({ analysisId: analysis.id, componentIds: selected, useCodex: assisted })))}/></>
-          : <SourceForm busy={busy} submit={request => run(async () => { const result = await api.analyze(request); setAnalysis(result); setSelected(result.components.length === 1 ? [result.components[0].id] : []); setUpdateTarget(undefined); setInstalledBundles([]); })}/>}
+          : analysis ? <><div className="back-row"><button className="quiet small" disabled={busy} onClick={() => setAnalysis(undefined)}>← Outra origem</button><span className="muted small">{analysis.request.url.replace('https://github.com/','').replace(/\.git$/,'')}</span></div><ComponentPicker analysis={analysis} selected={selected} change={setSelected} assisted={assisted} setAssisted={setAssisted} asPackage={asPackage} setAsPackage={setAsPackage} busy={busy} convert={() => run(async () => setBundles(await api.convert({ analysisId: analysis.id, componentIds: selected, useCodex: assisted,asPackage })))}/></>
+          : <SourceForm busy={busy} submit={request => run(async () => { const result = await api.analyze(request); setAnalysis(result); setSelected(defaultSelection(result.components));setAsPackage(true); setUpdateTarget(undefined); setInstalledBundles([]); })}/>}
         </div>}
         {tab === 'history' && <History records={history} busy={busy} verify={verify} update={id => run(async () => { const result = await api.prepareUpdate({ installationId: id, useCodex: assisted }); setBundles(result); setInstalledBundles([]); setUpdateTarget(id); setTab('convert'); })} remove={id => run(async () => { installed(await api.remove(id)); setInstalledBundles([]); })} restore={id => run(async () => { installed(await api.restore(id)); setInstalledBundles([]); })} review={id => run(async () => {
           const record = history.find(r => r.id === id); if (!record) throw new Error('Conversão não encontrada.');

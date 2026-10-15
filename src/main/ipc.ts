@@ -19,7 +19,7 @@ export function registerIpc(window: BrowserWindow, service: AppService): void {
   const noInput = z.undefined();
   add('diagnose',noInput,() => service.diagnose()); add('settings',noInput,() => service.settings());
   add('analyze',z.object({ url: z.string().max(1000), ref: z.string().max(200).optional(), subdirectory: z.string().max(220).optional() }).strict(),value => service.analyze(value));
-  add('convert',z.object({ analysisId: id, componentIds: z.array(id).min(1).max(1000), useCodex: z.boolean() }).strict(),value => service.convert(value.analysisId,value.componentIds,value.useCodex));
+  add('convert',z.object({ analysisId: id, componentIds: z.array(id).min(1).max(1000), useCodex: z.boolean(),asPackage:z.boolean().optional() }).strict(),value => service.convert(value.analysisId,value.componentIds,value.useCodex,value.asPackage));
   add('install',id,value => service.install(value));
   add('verifyInstallation',id,value => service.verifyInstallation(value));
   add('checkForUpdates',noInput,() => service.checkForUpdates());

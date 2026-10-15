@@ -12,7 +12,7 @@ import { snapshotFile, restoreFile } from './recovery';
 import { provenance } from './provenance';
 import { verifyBundleFiles, findPython } from './verification';
 import type { InstallationVerification, VerificationCheck } from '../shared/verification';
-import {markdownMetadata} from './inventory';
+import {skillCalls} from './skill-calls';
 export const MARKETPLACE = 'claude-to-codex-local';
 export interface InstallerContext { dataRoot: string; codexPath: string; codexHome?: string; signal?: AbortSignal; run?: (args: string[]) => Promise<any> }
 interface StateSnapshot { config: string|null; catalog: string|null }
@@ -158,8 +158,8 @@ export class CodexInstaller {
         checks.push({key:'python',label:'Python para os scripts incluídos',status:python.path ? 'passed' : 'warning',detail:python.path ? `${python.version} · ${python.path}` : 'Python 3 não encontrado nas localizações verificadas. Selecione um Python disponível na sessão antes de usar os scripts.'});
       }
       if (bundle.files.some(file => file.path === '.mcp.json')) checks.push({key:'mcp',label:'Integrações externas',status:'warning',detail:'Conexões MCP, credenciais e serviços externos não são testados por esta verificação.'});
-      const skillNames = bundle.files.filter(file => /^skills\/[^/]+\/SKILL\.md$/.test(file.path)).map(file => {try{const name=markdownMetadata(file.data.toString()).name;if(typeof name==='string'&&/^[a-z0-9][a-z0-9-]{0,59}$/.test(name))return name;}catch{}return file.path.split('/')[1];});
-      const testPrompt = skillNames.length ? `Use a skill $${skillNames[0]}. Leia o SKILL.md instalado, confira seus recursos e dependências e proponha um teste funcional pequeno. Informe quais comandos serão necessários antes de executá-los. Ao executar o teste autorizado, mostre o comando e o resultado real; se um recurso faltar, informe o erro exato.` : undefined;
+      const calls=skillCalls(bundle.files,bundle.entrySkill);
+      const testPrompt = calls.length ? `Use a skill ${calls[0]}. Leia o SKILL.md instalado, confira seus recursos e dependências e proponha um teste funcional pequeno. Informe quais comandos serão necessários antes de executá-los. Ao executar o teste autorizado, mostre o comando e o resultado real; se um recurso faltar, informe o erro exato.` : undefined;
       return {installationId,pluginId,recognized,enabled,checkedAt:new Date().toISOString(),checks,testPrompt};
     }
   async update(installationId: string, bundleId: string): Promise<InstallResult> { return this.perform('update', bundleId, installationId); }
@@ -193,7 +193,7 @@ export class CodexInstaller {
         await this.checkpoint(record);
         const recognized = await this.recognized(pluginName);
         if (recognized !== Boolean(bundle)) throw new Error('O Codex não confirmou o estado esperado da instalação.');
-        await this.store.save({ id: targetId, kind: 'installation', state: bundle ? 'installed' : 'removed', title: pluginName, createdAt: previous?.createdAt || new Date().toISOString(), data: { bundleId: bundle?.id || previous?.data.bundleId, source: bundle?.source || previous?.data.source, sourceCommit: bundle?.sourceCommit || previous?.data.sourceCommit, componentId: bundle?.componentId || previous?.data.componentId, updatedAt: new Date().toISOString() } });
+        await this.store.save({ id: targetId, kind: 'installation', state: bundle ? 'installed' : 'removed', title: pluginName, createdAt: previous?.createdAt || new Date().toISOString(), data: { bundleId: bundle?.id || previous?.data.bundleId, source: bundle?.source || previous?.data.source, sourceCommit: bundle?.sourceCommit || previous?.data.sourceCommit, componentId: bundle?.componentId || previous?.data.componentId,componentIds:bundle?bundle.componentIds:previous?.data.componentIds,asPackage:bundle?bundle.asPackage:previous?.data.asPackage,groupAll:bundle?bundle.groupAll:previous?.data.groupAll, updatedAt: new Date().toISOString() } });
         record.state = 'verified'; await this.store.save(record);
         return { operationId: id, installationId: targetId, state: action === 'install' ? 'installed' : action === 'update' ? 'updated' : 'removed', recognized, findings: [{ code: 'restart-codex', severity: 'info', message: 'Abra uma nova conversa ou reinicie o Codex para carregar as alterações.' }] };
       } catch (error) {

@@ -1,5 +1,8 @@
-import type { AnalysisView } from '../../shared/api';
-export function ComponentPicker({ analysis, selected, change, assisted, setAssisted, busy, convert }: { analysis: AnalysisView; selected: string[]; change: (value: string[]) => void; assisted: boolean; setAssisted: (value: boolean) => void; busy: boolean; convert: () => void }) {
+import type { AnalysisView,ComponentView } from '../../shared/api';
+export function defaultSelection(components:ComponentView[]):string[]{
+  const skills=components.filter(c=>c.kind==='skill');return skills.length?skills.map(c=>c.id):components.length===1?[components[0].id]:[];
+}
+export function ComponentPicker({ analysis, selected, change, assisted, setAssisted, asPackage,setAsPackage,busy, convert }: { analysis: AnalysisView; selected: string[]; change: (value: string[]) => void; assisted: boolean; setAssisted: (value: boolean) => void;asPackage:boolean;setAsPackage:(value:boolean)=>void; busy: boolean; convert: () => void }) {
   const components = analysis.components;
   const leafIds = components.filter(item => !components.some(child => child.parentPluginId === item.id)).map(item => item.id);
   const allLeaves = leafIds.length > 0 && leafIds.every(id => selected.includes(id)) && selected.length === leafIds.length;
@@ -21,6 +24,7 @@ export function ComponentPicker({ analysis, selected, change, assisted, setAssis
       <span className="component-icon" aria-hidden="true">{component.kind === 'plugin' ? '◇' : '⌘'}</span><span className="component-copy"><strong>{component.name}{component.kind === 'plugin' ? ' · plugin completo' : ''}</strong><small>{component.parentPluginId ? 'Skill de ' + components.find(item => item.id === component.parentPluginId)?.name + ' · ' : ''}{component.root || 'Raiz do repositório'} · {component.fileCount} arquivos</small></span>
       <span className={'tag ' + (component.findings.some(f => f.severity === 'blocking') ? 'danger' : '')}>{component.kind === 'plugin' ? 'Plugin' : 'Skill'}</span>
     </label>)}</div>
+    <label className="assisted"><input type="checkbox" checked={asPackage} disabled={busy} onChange={event=>setAsPackage(event.target.checked)}/><span><strong>Instalar como pacote</strong><small>Uma instalação e uma chamada para o conjunto. O Codex escolhe e combina as skills conforme a tarefa.</small></span></label>
     <label className="assisted"><input type="checkbox" checked={assisted} disabled={busy} onChange={event => setAssisted(event.target.checked)}/><span><strong>Usar o Codex na adaptação</strong><small>Reutiliza sua conta e usa internet quando a interpretação das instruções for necessária.</small></span></label>
     <div className="form-footer"><button type="button" className="quiet" disabled={busy} onClick={() => change(allLeaves ? [] : leafIds)}>{allLeaves ? 'Limpar seleção' : components.some(c => c.parentPluginId) ? 'Selecionar skills' : 'Selecionar todos'}</button><button className="primary" disabled={busy || !selected.length} onClick={convert}>Converter selecionados <span aria-hidden="true">→</span></button></div>
   </section>;

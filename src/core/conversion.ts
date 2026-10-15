@@ -9,6 +9,7 @@ import { adaptHooks } from './adapters/hooks';
 import { adaptWithCodex } from './semantic';
 import { resolveLayout } from './adapters/layout';
 import { preserveReferences } from './references';
+import {packageComponent,addPackageEntry} from './skill-packages';
 export function digest(data: Buffer): string { return createHash('sha256').update(data).digest('hex'); }
 export function validateBundle(bundle: ConversionBundle): Finding[] {
   const findings: Finding[] = []; const seen = new Set<string>();
@@ -27,7 +28,9 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
   if (!ids.length || new Set(ids).size !== ids.length || ids.some(id => !available.some(c => c.id === id))) throw new Error('Selecione componentes encontrados nesta análise.');
   if (available.some(component => ids.includes(component.id) && component.parentPluginId && ids.includes(component.parentPluginId))) throw new Error('Seleção sobreposta: escolha o plugin completo ou suas skills separadamente.');
   const results: ConversionBundle[] = [];
-  for (const component of available.filter(c => ids.includes(c.id))) {
+  const selected=available.filter(c=>ids.includes(c.id));
+  const targets=options.asPackage&&selected.length>1?[packageComponent(snapshot,selected)]:selected;
+  for (const component of targets) {
     if (options.signal?.aborted) throw new Error('Operação cancelada.');
     const id = randomUUID(); const name = slug(component.name); const owner = new URL(snapshot.request.url).pathname.split('/')[1];
     const originPath = [snapshot.request.subdirectory, component.root].filter(Boolean).join('/');
@@ -49,6 +52,14 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
     const sourceFiles = snapshot.files.filter(f => component.files.includes(f.path) && f.mode !== '160000');
     for (const source of snapshot.files.filter(f => component.files.includes(f.path))) if (source.mode === '160000' || source.data.toString('utf8',0,100).startsWith('version https://git-lfs.github.com/spec/v1')) findings.push({ code: 'external-resource', severity: 'blocking', message: 'Recurso externo não baixado: ' + source.path, file: source.path });
     const layout = resolveLayout(component.manifest || {}, sourceFiles, relative); findings.push(...layout.findings);
+    const skillFolders=new Map<string,string>();const usedFolders=new Set<string>();
+    for(const root of layout.skillRoots){
+      const base=slug(root.split('/').at(-1)||name);
+      const duplicated=layout.skillRoots.filter(other=>slug(other.split('/').at(-1)||name)===base).length>1;
+      let folder=options.asPackage&&duplicated?base.slice(0,48)+'-'+digest(Buffer.from(root)).slice(0,8):base;
+      if(options.asPackage){for(let suffix=1;usedFolders.has(folder);suffix++)folder=base.slice(0,48)+'-'+digest(Buffer.from(root)).slice(0,8)+'-'+suffix;}
+      usedFolders.add(folder);skillFolders.set(root,folder);
+    }
     for (const source of sourceFiles) {
       const rel = relative(source.path);
       if (rel.startsWith('.claude-plugin/') || rel === '.mcp.json' || rel.startsWith('hooks/')) continue;
@@ -60,7 +71,7 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
       } else {
         const skillRoot = layout.skillRoots.find(root => root ? rel.startsWith(root + '/') : rel === 'SKILL.md');
         if (skillRoot !== undefined) {
-          const skillName = slug(skillRoot.split('/').at(-1) || name); const suffix = skillRoot ? rel.slice(skillRoot.length + 1) : rel;
+          const skillName = skillFolders.get(skillRoot)!; const suffix = skillRoot ? rel.slice(skillRoot.length + 1) : rel;
           if (suffix === 'SKILL.md') {
             const target = 'skills/' + skillName + '/SKILL.md'; const adapted = adaptSkill(source.data.toString(), skillName); findings.push(...adapted.findings.map(f => ({...f,file:f.file || target}))); semantic ||= adapted.semantic; if(adapted.semantic)semanticPaths.add(target); put(target, adapted.text, source.path);
           } else put('skills/' + skillName + '/' + suffix, source.data, source.path);
@@ -115,7 +126,10 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
       } else for(const path of semanticPaths) findings.push({ code: 'semantic-needed', severity: 'blocking',file:path, message: 'Instruções dependentes do Claude: habilite a conversão assistida pelo Codex.' });
     }
     preserveReferences(snapshot, files, put, findings, true);
-    const bundle: ConversionBundle = { id, pluginName, sourceCommit: snapshot.commit, files: [...files.values()], findings, installable: false, source: snapshot.request, componentId: component.id, analysisId: snapshot.id };
+    const entrySkill=options.asPackage?addPackageEntry(snapshot,files,put,findings,options.packageEntry):undefined;
+    const skillIds=available.filter(c=>c.kind==='skill').map(c=>c.id);
+    const bundle: ConversionBundle = { id, pluginName, sourceCommit: snapshot.commit, files: [...files.values()], findings, installable: false, source: snapshot.request, componentId: component.id, analysisId: snapshot.id,
+      ...(options.asPackage?{asPackage:true,componentIds:ids,groupAll:skillIds.length>0&&skillIds.length===ids.length&&skillIds.every(item=>ids.includes(item)),entrySkill}:{}) };
     findings.push(...validateBundle(bundle)); bundle.installable = !findings.some(f => f.severity === 'blocking'); results.push(bundle);
   }
   return results;
