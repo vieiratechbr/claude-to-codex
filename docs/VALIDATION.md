@@ -211,3 +211,11 @@ A sintaxe `$nome` é documentada no [App Server oficial](https://learn.chatgpt.c
 Build NSIS e janela empacotada passaram. Instalador local `release/Claude-to-Codex-0.3.0-beta.1-Windows-x64-Setup.exe`: 113.284.481 bytes, SHA-256 `2f418ce7ac0d7ad2b4b0b8bc85093de3c0fd13946599bfc2dba5343074a90d8d`, Authenticode `NotSigned`. ASAR com versão correta e MIT preservada; sem fixtures ou scripts de QA do projeto. A prévia nativa foi recompilada sem instalação. O teste interativo de apoio marcado continua incompleto após o cancelamento por Esc, conforme registro acima. Nenhum NSIS foi instalado sobre o app pessoal.
 
 [Verificação Windows 38663375705](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38663375705), commit `2aa0862fc6b78d19d0a341eaa5ba078d6a81d1b8`: **success**. Passaram tipos, 150 testes, ciclo nativo isolado, quatro fluxos desktop, NSIS, janela empacotada e compilação da prévia nativa sem executá-la. Artifact `Windows-installer`, ID `11939822452`, digest ZIP `sha256:3acf6528ad2ae1025d82f0e341ac11c4b6437207cdc0b8def24ac9e9cb47c865`. O publisher fixa build e digest e exige aplicação idêntica, incluindo os recursos de `build/installer`, antes de promover o artifact.
+
+### Release e conferência pública
+
+[Publicação 38663774167](https://github.com/vieiratechbr/claude-to-codex/actions/runs/38663774167): **success**. Release [v0.3.0-beta.1](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.3.0-beta.1), ID `413317635`, `draft: false`, `prerelease: true`. Tag no commit `b2e47afd389029e0ab4bcb56a398645b7b36ef36`, com aplicação idêntica ao build aprovado. Releases e downloads anteriores preservados.
+
+Download sem autenticação concluído: 113.284.534 bytes, SHA-256 `325dcad81505a4700a8436d7167a112a86012a648fc5c9fcc6af49cc2ca6e938`, igual ao `SHA256SUMS.txt` e ao digest do asset `642226332`. Authenticode `NotSigned`. Relatório local `.cache/download-package-beta/report.json`. O arquivo público veio da CI; seu hash difere da geração local.
+
+A consulta de atualizações de produção identificou `0.3.0-beta.1` como disponível para `0.2.0-beta.1` e retornou estado atual para a própria `0.3.0-beta.1`, com URLs exatas da release e do instalador. Nenhum NSIS foi instalado sobre o aplicativo pessoal nesta rodada. A publicação mantém o estado beta e os limites funcionais documentados.
