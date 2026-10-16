@@ -26,11 +26,12 @@ it.skipIf(process.env.C2C_NATIVE_TEST!=='1')('Codex real respeita chamada manual
       await new Promise<void>(done=>server.listen(0,'127.0.0.1',done));
       try{
         const address=server.address();if(!address||typeof address==='string')throw new Error('Missing local fixture port');
-        const args=['-c','model_provider="fixture"','-c','model_providers.fixture.name="fixture"','-c',`model_providers.fixture.base_url="http://127.0.0.1:${address.port}/v1"`,'-c','model_providers.fixture.env_key="C2C_PROVIDER_FIXTURE_KEY"','-c','model_providers.fixture.wire_api="responses"','-c','model="fixture"','exec','--ignore-user-config','--ignore-rules','--ephemeral','--skip-git-repo-check','--sandbox','read-only','--cd',root,explicit?'$manual-probe Give advice.':'List relevant advice.'];
+        const args=['shell_tool','unified_exec','hooks','apps','multi_agent','remote_plugin','skill_mcp_dependency_install','memories'].flatMap(feature=>['--disable',feature]);
+        args.push('-c','model_provider="fixture"','-c','model_providers.fixture.name="fixture"','-c',`model_providers.fixture.base_url="http://127.0.0.1:${address.port}/v1"`,'-c','model_providers.fixture.env_key="C2C_PROVIDER_FIXTURE_KEY"','-c','model_providers.fixture.wire_api="responses"','-c','model="fixture"','exec','--ignore-user-config','--ignore-rules','--ephemeral','--skip-git-repo-check','--sandbox','read-only','--cd',root,explicit?'$manual-probe Give advice.':'List relevant advice.');
         await new Promise<void>((done,reject)=>{
           const child=spawn(executable!,args,{cwd:root,env:{...process.env,CODEX_HOME:home,C2C_PROVIDER_FIXTURE_KEY:'fixture-only'},windowsHide:true,stdio:['ignore','ignore','pipe']});let errors='';
           child.stderr.on('data',chunk=>errors+=chunk);const timeout=setTimeout(()=>{child.kill();reject(new Error('Local provider fixture timed out'));},30000);
-          child.on('error',error=>{clearTimeout(timeout);reject(error);});child.on('exit',()=>{clearTimeout(timeout);if(!captured)reject(new Error('No local provider request: '+errors.slice(-1000)));else done();});
+          child.on('error',error=>{clearTimeout(timeout);reject(error);});child.on('close',()=>{clearTimeout(timeout);if(!captured)reject(new Error('No local provider request: '+errors.slice(-1000)));else done();});
         });
         const input=JSON.stringify(captured!.input);
         expect(input.includes('Artificial advice fixture manual-probe')).toBe(explicit);
@@ -38,5 +39,5 @@ it.skipIf(process.env.C2C_NATIVE_TEST!=='1')('Codex real respeita chamada manual
         expect(input.includes('MANUAL_BODY_SENTINEL')).toBe(explicit);
       }finally{await new Promise<void>((done,reject)=>server.close(error=>error?reject(error):done()));}
     }
-  }finally{await rm(root,{recursive:true,force:true});}
+  }finally{await rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:200});}
 },90000);
