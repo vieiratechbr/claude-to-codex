@@ -133,6 +133,19 @@ it('bloqueia um asset obrigatório ausente sem contrato de arquivo do projeto', 
   expect(bundle.installable).toBe(false);
   expect(bundle.findings.some(f => f.code === 'missing-reference')).toBe(true);
 });
+it('distingue buscas de conteúdo do jogo de recursos distribuídos na skill',async()=>{
+  const input=source({'SKILL.md':'Scan the game project.\n- Glob `assets/**/*.tscn`, `assets/**/*.unity`, `assets/**/*.umap` to count implemented scenes.\n- Glob `assets/**/*.dialogue`, `assets/**/*.csv`, `assets/**/*.ink`.\nIf required project inputs are absent, report NOT ASSESSED.'});
+  const [bundle]=await convertComponents(input,[inventorySource(input)[0].id],options);
+  expect(bundle.installable,JSON.stringify(bundle.findings)).toBe(true);
+  expect(bundle.files.some(f=>f.path.includes('assets/'))).toBe(false);
+  expect(bundle.findings.filter(f=>f.code==='project-file-reference')).toHaveLength(6);
+});
+it('reconhece tabela de tradução de projeto e exemplos de saída sem ignorar assets obrigatórios',async()=>{
+  const input=source({'SKILL.md':'Ask: "May I write these new entries to `assets/data/strings/strings-en.json`?"\nRead `assets/data/strings/strings-en.json` — the source string table.\nAll values must live in `assets/data/[appropriate-file].json`, not hardcoded.\nRead required bundled template `assets/report.docx`.'});
+  const [bundle]=await convertComponents(input,[inventorySource(input)[0].id],options);
+  expect(bundle.findings.filter(f=>f.code==='missing-reference').map(f=>f.message)).toEqual(expect.arrayContaining([expect.stringContaining('assets/report.docx')]));
+  expect(bundle.findings.filter(f=>f.code==='missing-reference').some(f=>/strings-en|appropriate-file/.test(f.message))).toBe(false);
+});
 it('herda o contrato explícito de arquivos do projeto nas referências da skill', async () => {
   const input = source({
     'SKILL.md': 'The scripts read and write project files such as `assets/design-tokens.json`. Read [guide](references/update.md).',

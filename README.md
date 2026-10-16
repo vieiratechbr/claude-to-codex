@@ -12,6 +12,8 @@ Download direto, sem precisar compilar ou acessar artifacts de CI. A [release v0
 
 ![Janela do aplicativo](docs/images/application.png)
 
+O código da próxima **0.3.0-beta.2** corrige a adaptação de metadados, chamadas manuais, referências de projeto e recursos compartilhados. O download acima continua na última beta publicada até concluir a verificação Windows. A coleção Claude Code Game Studios ainda possui requisitos não portados; o pacote completo continua bloqueado.
+
 ## Requisitos
 
 - Windows x64; validação realizada no Windows 11.
@@ -42,7 +44,7 @@ No PowerShell, use `npm.cmd` se a política bloquear `npm.ps1`.
 npm run dist:win
 ```
 
-Saída: `release/Claude-to-Codex-0.3.0-beta.1-Windows-x64-Setup.exe`. A publicação promove o artifact de uma verificação Windows aprovada, sem recompilar durante a publicação. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
+Saída: `release/Claude-to-Codex-0.3.0-beta.2-Windows-x64-Setup.exe`. A publicação promove o artifact de uma verificação Windows aprovada, sem recompilar durante a publicação. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
 
 ## Usar
 

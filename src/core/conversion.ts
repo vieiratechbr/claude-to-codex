@@ -10,6 +10,8 @@ import { adaptWithCodex } from './semantic';
 import { resolveLayout } from './adapters/layout';
 import { preserveReferences } from './references';
 import {packageComponent,addPackageEntry} from './skill-packages';
+import {applyManualInvocationPolicy} from './skill-policies';
+import {preserveSourceContext} from './source-context';
 export function digest(data: Buffer): string { return createHash('sha256').update(data).digest('hex'); }
 export function validateBundle(bundle: ConversionBundle): Finding[] {
   const findings: Finding[] = []; const seen = new Set<string>();
@@ -37,7 +39,7 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
     const identity = createHash('sha256').update(snapshot.request.url + ':' + originPath).digest('hex').slice(0, 8);
     const pluginName = slug(owner + '-' + name).slice(0, 48) + '-' + identity;
     const findings = [...component.findings];
-    const files = new Map<string,BundleFile>(); let semantic = false; const semanticPaths=new Set<string>();
+    const files = new Map<string,BundleFile>(); let semantic = false; const semanticPaths=new Set<string>();const manualPaths=new Set<string>();
     const put = (path: string, data: Buffer|string, sourcePath?: string, replace = false) => {
       safeRelativePath(path); const bytes = typeof data === 'string' ? Buffer.from(data) : data;
       const key = path.normalize('NFC').toLowerCase(); const previous = [...files.values()].find(f => f.path.normalize('NFC').toLowerCase() === key);
@@ -47,6 +49,12 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
       }
       if (previous && replace && previous.path !== path) throw new Error('Substituição de caminho ambígua.');
       files.set(path, { path, data: bytes, sha256: digest(bytes), sourcePath: sourcePath || previous?.sourcePath });
+    };
+    const putSkill=(target:string,text:string,sourcePath:string|undefined,kind:'skill'|'command'|'agent'='skill')=>{
+      const adapted=adaptSkill(text,target.split('/').at(-2)!,kind);
+      findings.push(...adapted.findings.map(f=>({...f,file:f.file||target})));
+      semantic||=adapted.semantic;if(adapted.semantic)semanticPaths.add(target);if(adapted.manualOnly)manualPaths.add(target);
+      put(target,adapted.text,sourcePath);
     };
     const relative = (path: string) => component.root ? path.slice(component.root.length + 1) : path;
     const sourceFiles = snapshot.files.filter(f => component.files.includes(f.path) && f.mode !== '160000');
@@ -66,14 +74,14 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
       if (component.kind === 'skill') {
         if (rel === 'LICENSE' || rel.startsWith('LICENSE.')) put(rel, source.data, source.path);
         if (rel === 'SKILL.md') {
-          const target = 'skills/' + name + '/SKILL.md'; const adapted = adaptSkill(source.data.toString(), name); findings.push(...adapted.findings.map(f => ({...f,file:f.file || target}))); semantic ||= adapted.semantic; if(adapted.semantic)semanticPaths.add(target); put(target, adapted.text, source.path);
+          const target = 'skills/' + name + '/SKILL.md'; putSkill(target,source.data.toString(),source.path);
         } else put('skills/' + name + '/' + rel, source.data, source.path);
       } else {
         const skillRoot = layout.skillRoots.find(root => root ? rel.startsWith(root + '/') : rel === 'SKILL.md');
         if (skillRoot !== undefined) {
           const skillName = skillFolders.get(skillRoot)!; const suffix = skillRoot ? rel.slice(skillRoot.length + 1) : rel;
           if (suffix === 'SKILL.md') {
-            const target = 'skills/' + skillName + '/SKILL.md'; const adapted = adaptSkill(source.data.toString(), skillName); findings.push(...adapted.findings.map(f => ({...f,file:f.file || target}))); semantic ||= adapted.semantic; if(adapted.semantic)semanticPaths.add(target); put(target, adapted.text, source.path);
+            const target = 'skills/' + skillName + '/SKILL.md'; putSkill(target,source.data.toString(),source.path);
           } else put('skills/' + skillName + '/' + suffix, source.data, source.path);
         } else put(rel, source.data, source.path);
       }
@@ -81,7 +89,7 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
     if (component.kind === 'plugin') for (const prompt of layout.prompts) {
       const skillName = slug(prompt.kind + '-' + prompt.name); const target = 'skills/' + skillName + '/SKILL.md';
       if (files.has(target)) { findings.push({ code: 'duplicate-component', severity: 'blocking', message: 'Componentes diferentes usam o mesmo nome: ' + skillName }); continue; }
-      const adapted = adaptSkill(prompt.text, skillName, prompt.kind); findings.push(...adapted.findings.map(f => ({...f,file:f.file || target}))); semantic ||= adapted.semantic; if(adapted.semantic)semanticPaths.add(target); put(target, adapted.text, prompt.sourcePath);
+      putSkill(target,prompt.text,prompt.sourcePath,prompt.kind);
     }
     const manifest = adaptManifest(component.manifest || {}, pluginName, owner); findings.push(...manifest.findings);
     findings.push(...adaptHooks(component.manifest?.hooks !== undefined || sourceFiles.some(f => /(^|\/)hooks\/hooks\.json$/.test(f.path))));
@@ -114,6 +122,7 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
       }
     }
     preserveReferences(snapshot, files, put, findings);
+    preserveSourceContext(snapshot,files,put,findings);
     put('.codex-plugin/plugin.json', JSON.stringify(manifest.manifest, null, 2));
     options.onProgress?.({ operationId: id, stage: 'conversion', message: 'Adaptando ' + component.name });
     if (semantic) {
@@ -121,11 +130,20 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
         try {
           const proposed = await adaptWithCodex({ files: skills.map(path => ({ path, content: files.get(path)!.data.toString() })), findings, supportingFiles: [...files.values()] }, options);
           findings.push(...proposed.findings);
-          for (const file of proposed.files) { const adapted = adaptSkill(file.content, file.path.split('/').at(-2)!); if (adapted.semantic) throw new Error('A skill ' + file.path + ' ainda contém instruções específicas do Claude Code.'); findings.push(...adapted.findings); put(file.path, adapted.text, undefined, true); }
+          for (const file of proposed.files) {
+            const adapted = adaptSkill(file.content, file.path.split('/').at(-2)!);
+            if (adapted.semantic) throw new Error('A skill ' + file.path + ' ainda contém instruções específicas do Claude Code.');
+            findings.push(...adapted.findings.map(f=>({...f,file:f.file||file.path})));
+            put(file.path, adapted.text, undefined, true);
+            for(const finding of findings.filter(f=>f.code==='dynamic-command'&&f.file===file.path)){
+              finding.code='dynamic-command-adapted';finding.severity='warning';finding.message='O contexto dinâmico da origem foi adaptado para obtenção explícita durante o uso. Confira o procedimento e suas dependências na revisão.';
+            }
+          }
         } catch (error) { findings.push({ code: 'semantic-failed', severity: 'blocking', message: (error as Error).message, file:(error as Error).message.match(/skills\/[a-z0-9-]+\/SKILL\.md/)?.[0] }); }
       } else for(const path of semanticPaths) findings.push({ code: 'semantic-needed', severity: 'blocking',file:path, message: 'Instruções dependentes do Claude: habilite a conversão assistida pelo Codex.' });
     }
     preserveReferences(snapshot, files, put, findings, true);
+    applyManualInvocationPolicy(manualPaths,files,put,findings);
     const entrySkill=options.asPackage?addPackageEntry(snapshot,files,put,findings,options.packageEntry):undefined;
     const skillIds=available.filter(c=>c.kind==='skill').map(c=>c.id);
     const bundle: ConversionBundle = { id, pluginName, sourceCommit: snapshot.commit, files: [...files.values()], findings, installable: false, source: snapshot.request, componentId: component.id, analysisId: snapshot.id,

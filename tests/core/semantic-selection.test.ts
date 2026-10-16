@@ -4,6 +4,17 @@ import { inventorySource } from '../../src/core/inventory';
 import { adaptWithCodex } from '../../src/core/semantic';
 import type { SourceSnapshot } from '../../src/shared/contracts';
 vi.mock('../../src/core/semantic', () => ({ adaptWithCodex: vi.fn() }));
+it('remove somente o impedimento dinâmico resolvido pela adaptação validada',async()=>{
+  const input:SourceSnapshot={id:'dynamic',request:{url:'https://github.com/acme/dynamic'},commit:'a'.repeat(40),warnings:[],files:[{path:'SKILL.md',data:Buffer.from('---\nname: context\ndescription: Read current state\n---\n!`git status --short`\nUse the current status to plan.'),mode:'100644',oid:''}]};
+  vi.mocked(adaptWithCodex).mockImplementation(async request=>({files:request.files.map(f=>({path:f.path,content:'---\nname: context\ndescription: Read current state\n---\nBefore planning, obtain the current status by running `git status --short` in the project, subject to session permissions. Read its output before planning. If unavailable, report that the current status was not checked.'})),findings:[]}));
+  const [bundle]=await convertComponents(input,[inventorySource(input)[0].id],{useCodex:true,dataRoot:'unused',diagnostics:{authenticated:false,capabilities:{exec:false,pluginAdd:true,marketplaceAdd:true,pluginListJson:true,isolatedConversion:false},findings:[]}});
+  expect(bundle.installable,JSON.stringify(bundle.findings)).toBe(true);
+  expect(bundle.findings.some(f=>f.code==='dynamic-command'&&f.severity==='blocking')).toBe(false);
+  expect(bundle.findings.some(f=>f.code==='dynamic-command-adapted'&&f.severity==='warning')).toBe(true);
+  vi.mocked(adaptWithCodex).mockImplementation(async request=>({files:request.files,findings:[]}));
+  const [unchanged]=await convertComponents(input,[inventorySource(input)[0].id],{useCodex:true,dataRoot:'unused',diagnostics:{authenticated:false,capabilities:{exec:false,pluginAdd:true,marketplaceAdd:true,pluginListJson:true,isolatedConversion:false},findings:[]}});
+  expect(unchanged.installable).toBe(false);
+});
 it('envia apenas skills ativas para o modelo e preserva cópias inativas do repositório', async () => {
   const input: SourceSnapshot = { id: 'fixture', request: { url: 'https://github.com/acme/design.git' }, commit: 'a'.repeat(40), warnings: [], files: Object.entries({
     '.claude-plugin/plugin.json': '{"name":"design"}',

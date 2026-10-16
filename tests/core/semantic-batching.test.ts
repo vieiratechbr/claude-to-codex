@@ -38,6 +38,18 @@ it.each(['absent', 'repeated'])('rejeita edição sem trecho de origem único: %
   vi.mocked(checkedProcess).mockResolvedValue(answer([{ path: 'skills/one/SKILL.md', edits: [{ oldText: token, newText: 'changed' }] }]));
   await expect(adaptWithCodex({ files: [{ path: 'skills/one/SKILL.md', content: 'repeated repeated' }], findings: [] }, await context())).rejects.toThrow(/trecho único/i);
 });
+it('reenvia edição ambígua com feedback e aplica somente a correção exata',async()=>{
+  let calls=0;
+  vi.mocked(checkedProcess).mockImplementation(async(_exe,_args,options)=>{
+    const input=request(options),file=input.files[0];calls++;
+    if(calls===1)return answer([{path:file.path,edits:[{oldText:'repeated',newText:'wrong'}]}]);
+    expect(input.validationFeedback).toMatch(/trecho único/i);
+    expect(file.content).toBe('Claude Code repeated repeated');
+    return answer([{path:file.path,edits:[{oldText:'Claude Code',newText:'Codex'}]}]);
+  });
+  const result=await adaptWithCodex({files:[{path:'skills/repair/SKILL.md',content:'Claude Code repeated repeated'}],findings:[]},await context());
+  expect(result.files[0].content).toBe('Codex repeated repeated');expect(calls).toBe(2);
+});
 it('rejeita edições sobrepostas em vez de aplicar uma origem já alterada', async () => {
   vi.mocked(checkedProcess).mockResolvedValue(answer([{ path: 'skills/one/SKILL.md', edits: [{ oldText: 'abc', newText: 'X' }, { oldText: 'bcd', newText: 'Y' }] }]));
   await expect(adaptWithCodex({ files: [{ path: 'skills/one/SKILL.md', content: 'abcdef' }], findings: [] }, await context())).rejects.toThrow(/sobrepostas/i);
