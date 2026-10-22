@@ -506,6 +506,50 @@ it('ports only the known mode pseudocode and retains modes, choices, logging and
   expect((await port(historical)).text).toBe(historical);
 });
 
+it('ports only the literal assertion paragraph and preserves the actual adjacent agent evaluation clauses',async()=>{
+  const assertion=[
+    '- **Static Assertions** — check each against the agent\'s frontmatter and body.',
+    '  An assertion that names a literal value (a `model:` alias, a frontmatter key,',
+    '  a tool name) is an exact comparison with the file: `model: inherit` does not',
+    '  satisfy "Model tier is `sonnet`", and a near match is FAIL, never PARTIAL.'
+  ].join('\n');
+  const adjacent=[
+    '- **Test Cases** — evaluate each case\'s expected behavior against the agent\'s',
+    '  written instructions, the same way a skill\'s are evaluated below. A case',
+    '  that names a gate ID (`LP-FEASIBILITY`, `CD-PILLARS`, …) is that gate\'s',
+    '  invocation: the spawning skill has the agent read',
+    '  `.claude/docs/director-gates/[gate-id].md` first, so that file\'s Prompt and',
+    '  Verdicts are the agent\'s instructions for the case — read it too.',
+    '- **Redirect and escalation cases** — the agent is asked for work another role',
+    '  owns, or meets a conflict it cannot settle. The case is met when the loaded',
+    '  `coordination-rules.md` covers the step — rule 2 (no binding decisions',
+    '  outside its domain), rule 3 (escalate a conflict to the shared parent) or',
+    '  rule 5 (no files outside its directories without delegation) — **and** the',
+    '  agent\'s own file names the owning role in its collaborator, delegation,',
+    '  escalation or "must not" lists. Cite both; do not require the agent to',
+    '  restate the redirect in its own words. It is a FAIL when the agent\'s file',
+    '  claims that work for itself, or when no loaded file names who owns it.',
+    '- **Protocol Compliance** — use the spec\'s own `## Protocol Compliance` list in',
+    '  place of the four skill checks below.'
+  ].join('\n');
+  const result=await port(assertion+'\n'+adjacent);
+  expect(result.text).toContain('- **Static Assertions** — check each against the agent\'s frontmatter and body.');
+  expect(result.text).toContain('For a platform-specific assertion');
+  expect(result.text).toContain(adjacent);
+});
+it.each([
+  '- **Next requirement** — preserve this exact verdict: FAIL.',
+  '* **Next requirement** — preserve this exact verdict: FAIL.',
+  '+ **Next requirement** — preserve this exact verdict: FAIL.',
+  '2. Preserve this exact verdict: FAIL.',
+  '## Next requirement\nPreserve this exact verdict: FAIL.',
+  '> Preserve this exact verdict: FAIL.'
+])('does not swallow a following Markdown block while porting a literal assertion: %s',async next=>{
+  const result=await port('An assertion that names a literal value (a `model:` alias,\na frontmatter key) compares the source metadata.\n'+next);
+  expect(result.text).toContain('For a platform-specific assertion');
+  expect(result.text).toContain(next);
+});
+
 it('recognizes mapped instruction resources even when their preserved filenames retain source spelling', async () => {
   const result = await port('Read CLAUDE.md before writing. Read @.claude/docs/coding-standards.md.', { sourceToTarget: {
     'CLAUDE.md': 'source-context/CLAUDE.md',
@@ -725,4 +769,95 @@ it('ports backticked write-capability predicates in one stable pass', async () =
   const first = await port('**FAIL** if `allowed-tools` includes `Write` or `Edit` but no ask-before-write language is found.');
   expect(first.text).not.toContain('`allowed-tools` includes');
   expect((await port(first.text)).text).toBe(first.text);
+});
+
+const runtimeSourceClauses = {
+  boundedReads: "6. **Read Design Docs by Section**: A brief names the sections an agent needs\n   by heading. Find a heading in a GDD, ADR or the art bible with the Grep\n   tool (`^#`, content mode) and Read that range with offset and limit; read a doc\n   whole only when the task needs all of it, and say why. `validate-read.sh`\n   refuses a whole-file read of a doc over 40 KB.",
+  coordinationModels: "**Key point:** whether a skill's `model:` is used\ndepends on how the skill starts. Typed as `/skill-name`: yes, except a `haiku`\npin in auto mode. Started by Claude through the Skill tool: no. Never tell a\nuser a `haiku` skill saves money; an `opus` skill typed in a Sonnet session\ncosts more. The agent-side `model:` is a different mechanism, and is applied.",
+  coordinationSubagents: "### Subagents (current, always active)\nSpawned via the `Agent` tool within a single Claude Code session. Used by all\n`team-*` skills and orchestration skills. Subagents share the session's\npermission context, run sequentially or in parallel within the session, and\nreturn results to the parent.",
+  coordinationTeams: "### Agent Teams (experimental — opt-in)\nMultiple independent Claude Code *sessions* coordinated via a shared task list.\nOpt-in only — read `.claude/docs/agent-teams.md` on demand before proposing one.",
+  teamDescription: "Multiple independent Claude Code *sessions* running simultaneously, coordinated\nvia a shared task list. Each session has its own context window and token budget.\nRequires the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` environment variable.",
+  teamAdoption: "Opt-in via `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Document first usage here\nwhen adopted.",
+  modelInvocation: "> ### When a skill's `model:` is used — skills only\n>\n> A skill's `model:` overrides the session model for the rest of the turn the\n> skill runs in, and your next prompt returns to the session model. Whether the\n> override happens depends on how the skill starts:\n>\n> | How the skill starts | Is `model:` used? |\n> |---|---|\n> | You type `/skill-name` in Manual (`default`) mode | Yes |\n> | You type `/skill-name` in auto mode | `sonnet` and `opus`: yes. `haiku`: no — auto mode does not support Haiku, so the session keeps its model |\n> | Claude starts the skill itself, through the Skill tool | No — the session model runs it |\n>\n> Two things follow:\n>\n> - **An `opus` skill costs more in a Sonnet session.** Typing\n>   `/architecture-review`, `/gate-check` or `/review-all-gdds` moves that turn\n>   to Opus.\n> - **A `haiku` skill saves nothing in auto mode** (this project's settings start\n>   terminal sessions in Manual, but a user can switch) — or when Claude starts\n>   it. Never tell a user a `haiku` tier is saving them money.\n>\n> Because the override ends at your next prompt, a skill that stops to ask you\n> something in chat finishes on the session model after you answer.\n>\n> **This does NOT apply to agents.** `model:` in `.claude/agents/*.md` is a\n> different mechanism, spawned as a separate session rather than executed inline,\n> and Claude Code documents it as applied: it is second in the subagent model\n> order, after a `model` Claude passes for one invocation. See the agent section\n> below.",
+  modelAliases: "Skills and agents are assigned tiers by task complexity. A tier is written as\nthe alias `model:` takes, never as a model ID: Claude Code resolves each alias\nto the current model in that family, so this table does not change when a new\nmodel ships.",
+  modelAuthoring: "All other skills are Sonnet. When creating a new skill, assign Haiku if it only\nreads and formats; assign Opus if it must synthesize 5+ documents with\nhigh-stakes output; otherwise write `model: sonnet` explicitly. Every skill\ndeclares a tier. Whether the tier takes effect depends on how the skill starts\n(see the table at the top of this file).",
+  agentTiers: "**Agent model tiers.** 30 agents use `model: inherit` and run on the session's\nmodel. 19 are pinned:\n\n- **opus (3):** `creative-director`, `producer`, `technical-director`. Under an\n  Opus session an `opus` pin runs on the session's exact model, `[1m]` included,\n  so it never gets a smaller window than its parent.",
+  agentOwnPreference: "Every agent not named above is `inherit`. The `model:` line in the agent's own\nfile is what runs.",
+  agentForceModel: "A pin gets that model's context window, whatever the session runs. On the\nAnthropic API `sonnet` currently resolves to Sonnet 5, which always has a 1M\nwindow, so a `sonnet` pin is not smaller than a 1M session there; `haiku`\nresolves to Haiku 4.5 and its 200K window, and behind an LLM gateway a `sonnet`\npin can be smaller too. A subagent starts from\nthe brief it is given, not the parent's conversation, so this only matters when\na brief is very large. If a pinned agent does overflow, run every subagent on\nthe session's model with one line in your `.claude/settings.local.json`\n(Claude Code v2.1.257 or later):\n\n```json\n{ \"env\": { \"CLAUDE_CODE_SUBAGENT_MODEL_FORCE\": \"1\" } }\n```\n\nIt applies to **every** pin, the three `opus` directors included: under a\nSonnet session they run on Sonnet too. `CLAUDE_CODE_SUBAGENT_MODEL` alone does\nnot do it: it applies only to agents that set no model of their own.",
+  tierTable: "| Tier | `model:` | When to use |\n|------|----------|-------------|\n| **Haiku** | `haiku` | Read-only status checks, formatting, simple lookups — no creative judgment needed |\n| **Sonnet** | `sonnet` | Implementation, design authoring, analysis of individual systems — default for most work |\n| **Opus** | `opus` | Multi-document synthesis, high-stakes phase gate verdicts, cross-system holistic review |\n| **Session** | `inherit` | Agents only — runs on whatever model the session runs |",
+  agentAssignments: "- **sonnet (16):** `lead-programmer`, `prototyper`, `devops-engineer`,\n  `community-manager` and the 12 engine sub-specialists:\n  `godot-csharp-specialist`, `godot-gdextension-specialist`,\n  `godot-gdscript-specialist`, `godot-shader-specialist`,\n  `ue-blueprint-specialist`, `ue-gas-specialist`, `ue-replication-specialist`,\n  `ue-umg-specialist`, `unity-addressables-specialist`,\n  `unity-dots-specialist`, `unity-shader-specialist`, `unity-ui-specialist`.\n  `/dev-story` and `/code-review` spawn the sub-specialists named in\n  `project.yaml`'s `specialists` block (which `/setup-engine` writes); `/team-ui` spawns\n  `unity-ui-specialist` and `ue-umg-specialist`; `/team-release` spawns\n  `devops-engineer` and `community-manager`, and `/team-live-ops` spawns\n  `community-manager`.\n- **haiku (0):** no agent. The Haiku row above is for read-only lookups and\n  formatting; every agent drafts, writes or judges. Building CI pipelines and\n  writing player-facing text are Sonnet work, as they are for `/patch-notes`.",
+  teamCriteria: "## Use agent teams when\n\n- Work spans multiple subsystems that will not touch the same files\n- Each workstream would take >30 minutes and benefits from true parallelism\n- A senior agent (technical-director, producer) needs to coordinate 3+ specialist\n  sessions working on different epics simultaneously\n\n## Do not use agent teams when\n\n- One session's output is required as input for another (use sequential subagents)\n- The task fits in a single session's context (use subagents instead)\n- Cost is a concern — each team member burns tokens independently"
+};
+
+
+const mappedReadGuard={
+  sourceToTarget:{'.claude/scripts/read-guard.sh':'source-context/.claude/scripts/read-guard.sh'},
+  installedResourcePaths:['codex-compat/run-helper.py','codex-compat/scripts.json','source-context/.claude/scripts/read-guard.sh']
+};
+it('uses the registered read-guard observations before the real reader and stops LARGE whole-file reads',async()=>{
+ const result=await port(runtimeSourceClauses.boundedReads,mappedReadGuard);
+ expect(result.semanticNeeded).toBe(false);
+ expect(result.text).not.toContain('`validate-read.sh`');
+ expect(result.text).toContain('--script "source-context/.claude/scripts/read-guard.sh" -- check');
+ expect(result.text).toContain('--bounded no');
+ expect(result.text).toContain('--bounded yes');
+ expect(result.text).toContain('-- sections');
+ expect(result.text).toMatch(/LARGE[^\n]*(?:STOP|refuse)|(?:STOP|refuse)[^\n]*LARGE/);
+ expect(result.text).toMatch(/exit 0[^\n]*(?:not|observations)|observations[^\n]*exit 0/i);
+ expect(result.text).toMatch(/offset[^\n]*limit/);
+ expect(result.text).toMatch(/(?:no|not)[^\n]*automatic[^\n]*(?:intercept|hook)/i);
+ expect((await port(result.text,mappedReadGuard)).text).toBe(result.text);
+});
+it.each([
+ {},
+ {...mappedReadGuard,installedResourcePaths:['source-context/.claude/scripts/read-guard.sh']},
+ {...mappedReadGuard,sourceToTarget:{...mappedReadGuard.sourceToTarget,'other/.claude/scripts/read-guard.sh':'source-context/other/read-guard.sh'}}
+])('retains the read requirement as blocking without one verified runner route: %j',async extra=>{
+ const result=await port(runtimeSourceClauses.boundedReads,extra);
+ expect(result.semanticNeeded).toBe(true);
+ expect(result.findings.some(f=>f.code==='workflow-read-guard-route-unresolved'&&f.severity==='blocking')).toBe(true);
+ expect(result.text).toContain('refuses a whole-file read');
+});
+it('keeps the experimental independent-session option disabled while preserving its criteria and costs',async()=>{
+ const result=await port('# Agent Teams (experimental — opt-in)\n\n'+runtimeSourceClauses.teamDescription+'\n\n'+runtimeSourceClauses.teamCriteria+'\n\n## Current status\n\n'+runtimeSourceClauses.teamAdoption);
+ expect(result.semanticNeeded).toBe(false);
+ expect(claudeSyntaxMarkers(result.text)).toEqual([]);
+ expect(result.text).toContain(runtimeSourceClauses.teamCriteria);
+ expect(result.text).toMatch(/(?:disabled|inactive)[^\n]*(?:source|feature)|(?:source|feature)[^\n]*(?:disabled|inactive)/i);
+ expect(result.text).toMatch(/(?:STOP|do not start|must not start)[^\n]*(?:verified|verify)|(?:verified|verify)[^\n]*(?:STOP|do not start|must not start)/i);
+ expect(result.text).toMatch(/team-\*[^\n]*subagents|subagents[^\n]*team-\*/);
+ expect((await port(result.text)).text).toBe(result.text);
+});
+it('ports the actual coordination mechanics without claiming source team sessions or source model overrides',async()=>{
+ const result=await port([runtimeSourceClauses.boundedReads,runtimeSourceClauses.coordinationModels,runtimeSourceClauses.coordinationSubagents,runtimeSourceClauses.coordinationTeams].join('\n\n'),mappedReadGuard);
+ expect(result.semanticNeeded).toBe(false);
+ expect(claudeSyntaxMarkers(result.text)).toEqual([]);
+ expect(result.text).toMatch(/selected[^\n]*(?:Codex|target)[^\n]*model|selected[^\n]*model[^\n]*(?:Codex|target)/i);
+ expect(result.text).toMatch(/independent[^\n]*sessions[^\n]*(?:disabled|inactive)|(?:disabled|inactive)[^\n]*independent[^\n]*sessions/i);
+ expect(result.text).toMatch(/actual[^\n]*(?:delegation|subagent)/i);
+});
+it('retains complexity tiers and role assignments as source preferences without source override, price or window promises',async()=>{
+ const input=[runtimeSourceClauses.modelInvocation,runtimeSourceClauses.modelAliases,runtimeSourceClauses.tierTable,runtimeSourceClauses.modelAuthoring,runtimeSourceClauses.agentTiers,runtimeSourceClauses.agentAssignments,runtimeSourceClauses.agentOwnPreference,runtimeSourceClauses.agentForceModel].join('\n\n');
+ const result=await port(input);
+ expect(result.semanticNeeded).toBe(false);
+ expect(claudeSyntaxMarkers(result.text)).toEqual([]);
+ expect(result.text).toContain(runtimeSourceClauses.tierTable);
+ expect(result.text).toContain(runtimeSourceClauses.agentAssignments);
+ expect(result.text).toMatch(/source[^\n]*preferences?|preferences?[^\n]*source/i);
+ expect(result.text).toMatch(/actual[^\n]*(?:binding|config|model)/i);
+ expect(result.text).not.toContain('CLAUDE_CODE_SUBAGENT_MODEL_FORCE');
+ expect(result.text).not.toContain('alias `model:` takes, never as a model ID');
+ expect(result.text).toMatch(/(?:not|no)[^\n]*(?:cost|price|window)|(?:cost|price|window)[^\n]*(?:not|no)/i);
+ expect(result.text).toMatch(/brief[^\n]*(?:bound|overflow|context)|(?:bound|overflow|context)[^\n]*brief/i);
+ expect((await port(result.text)).text).toBe(result.text);
+});
+it('leaves unknown model/team mechanics and separately required technical isolation unresolved',async()=>{
+ const unknown=await port(runtimeSourceClauses.agentForceModel.replace('CLAUDE_CODE_SUBAGENT_MODEL_FORCE','CLAUDE_CODE_OTHER_MODEL_FORCE'));
+ expect(unknown.semanticNeeded).toBe(true);
+ expect(unknown.text).toContain('CLAUDE_CODE_OTHER_MODEL_FORCE');
+ const strict=await port(runtimeSourceClauses.boundedReads+'\nThe reader MUST have a separate read-only sandbox.',mappedReadGuard);
+ expect(strict.semanticNeeded).toBe(true);
+ expect(strict.findings.some(f=>f.code==='workflow-strict-runtime-control')).toBe(true);
+ const historical='````text\n'+runtimeSourceClauses.teamDescription+'\n````';
+ expect((await port(historical)).text).toBe(historical);
 });

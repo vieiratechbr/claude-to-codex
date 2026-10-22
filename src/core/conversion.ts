@@ -95,7 +95,8 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
       putSkill(target,prompt.text,prompt.sourcePath,prompt.kind);
     }
     const manifest = adaptManifest(component.manifest || {}, pluginName, owner); findings.push(...manifest.findings);
-    findings.push(...adaptHooks(component.manifest?.hooks !== undefined || sourceFiles.some(f => /(^|\/)hooks\/hooks\.json$/.test(f.path))));
+    const sourceHooksSelected=component.manifest?.hooks !== undefined || sourceFiles.some(f => /(^|\/)hooks\/hooks\.json$/.test(f.path));
+    findings.push(...adaptHooks(sourceHooksSelected));
     const mcpInputs: unknown[] = [];
     const defaultMcp = sourceFiles.find(f => relative(f.path) === '.mcp.json');
     if (defaultMcp) { try { mcpInputs.push(JSON.parse(defaultMcp.data.toString())); } catch { findings.push({ code: 'invalid-mcp', severity: 'blocking', message: 'JSON MCP inválido.' }); } }
@@ -146,7 +147,9 @@ export async function convertComponents(snapshot: SourceSnapshot, ids: string[],
     if (semanticPaths.size) {
       if (options.useCodex) {
         try {
+          const members=options.asPackage&&selected.length>1?selected:[component];
           const proposed = await adaptWithCodex({ files: [...semanticPaths].map(path => ({ path, content: files.get(path)!.data.toString() })), findings, supportingFiles: [...files.values()], activeSkillPaths:skills,
+            conversionScope:{selectedComponents:members.map(({kind,root,name})=>({kind,root,name})),sourceHooks:{selected:sourceHooksSelected,converted:false},sourceHostSettingsActivated:false},
             validateFile:file=>{
               const workflow=adaptWorkflowText(file.content,workflowContexts.get(file.path)!);
               const markers=claudeSyntaxMarkers(workflow.text);

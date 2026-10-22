@@ -102,6 +102,22 @@ const automationModeClause=[
   '4. If the question comes back skipped, dismissed or empty, it is not an',
   '   answer: see §Every mode: a question with no answer.','```'
 ].join('\n');
+
+const runtimeSourceClauses = {
+  boundedReads: "6. **Read Design Docs by Section**: A brief names the sections an agent needs\n   by heading. Find a heading in a GDD, ADR or the art bible with the Grep\n   tool (`^#`, content mode) and Read that range with offset and limit; read a doc\n   whole only when the task needs all of it, and say why. `validate-read.sh`\n   refuses a whole-file read of a doc over 40 KB.",
+  coordinationModels: "**Key point:** whether a skill's `model:` is used\ndepends on how the skill starts. Typed as `/skill-name`: yes, except a `haiku`\npin in auto mode. Started by Claude through the Skill tool: no. Never tell a\nuser a `haiku` skill saves money; an `opus` skill typed in a Sonnet session\ncosts more. The agent-side `model:` is a different mechanism, and is applied.",
+  coordinationSubagents: "### Subagents (current, always active)\nSpawned via the `Agent` tool within a single Claude Code session. Used by all\n`team-*` skills and orchestration skills. Subagents share the session's\npermission context, run sequentially or in parallel within the session, and\nreturn results to the parent.",
+  coordinationTeams: "### Agent Teams (experimental — opt-in)\nMultiple independent Claude Code *sessions* coordinated via a shared task list.\nOpt-in only — read `.claude/docs/agent-teams.md` on demand before proposing one.",
+  teamDescription: "Multiple independent Claude Code *sessions* running simultaneously, coordinated\nvia a shared task list. Each session has its own context window and token budget.\nRequires the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` environment variable.",
+  teamAdoption: "Opt-in via `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Document first usage here\nwhen adopted.",
+  modelInvocation: "> ### When a skill's `model:` is used — skills only\n>\n> A skill's `model:` overrides the session model for the rest of the turn the\n> skill runs in, and your next prompt returns to the session model. Whether the\n> override happens depends on how the skill starts:\n>\n> | How the skill starts | Is `model:` used? |\n> |---|---|\n> | You type `/skill-name` in Manual (`default`) mode | Yes |\n> | You type `/skill-name` in auto mode | `sonnet` and `opus`: yes. `haiku`: no — auto mode does not support Haiku, so the session keeps its model |\n> | Claude starts the skill itself, through the Skill tool | No — the session model runs it |\n>\n> Two things follow:\n>\n> - **An `opus` skill costs more in a Sonnet session.** Typing\n>   `/architecture-review`, `/gate-check` or `/review-all-gdds` moves that turn\n>   to Opus.\n> - **A `haiku` skill saves nothing in auto mode** (this project's settings start\n>   terminal sessions in Manual, but a user can switch) — or when Claude starts\n>   it. Never tell a user a `haiku` tier is saving them money.\n>\n> Because the override ends at your next prompt, a skill that stops to ask you\n> something in chat finishes on the session model after you answer.\n>\n> **This does NOT apply to agents.** `model:` in `.claude/agents/*.md` is a\n> different mechanism, spawned as a separate session rather than executed inline,\n> and Claude Code documents it as applied: it is second in the subagent model\n> order, after a `model` Claude passes for one invocation. See the agent section\n> below.",
+  modelAliases: "Skills and agents are assigned tiers by task complexity. A tier is written as\nthe alias `model:` takes, never as a model ID: Claude Code resolves each alias\nto the current model in that family, so this table does not change when a new\nmodel ships.",
+  modelAuthoring: "All other skills are Sonnet. When creating a new skill, assign Haiku if it only\nreads and formats; assign Opus if it must synthesize 5+ documents with\nhigh-stakes output; otherwise write `model: sonnet` explicitly. Every skill\ndeclares a tier. Whether the tier takes effect depends on how the skill starts\n(see the table at the top of this file).",
+  agentTiers: "**Agent model tiers.** 30 agents use `model: inherit` and run on the session's\nmodel. 19 are pinned:\n\n- **opus (3):** `creative-director`, `producer`, `technical-director`. Under an\n  Opus session an `opus` pin runs on the session's exact model, `[1m]` included,\n  so it never gets a smaller window than its parent.",
+  agentOwnPreference: "Every agent not named above is `inherit`. The `model:` line in the agent's own\nfile is what runs.",
+  agentForceModel: "A pin gets that model's context window, whatever the session runs. On the\nAnthropic API `sonnet` currently resolves to Sonnet 5, which always has a 1M\nwindow, so a `sonnet` pin is not smaller than a 1M session there; `haiku`\nresolves to Haiku 4.5 and its 200K window, and behind an LLM gateway a `sonnet`\npin can be smaller too. A subagent starts from\nthe brief it is given, not the parent's conversation, so this only matters when\na brief is very large. If a pinned agent does overflow, run every subagent on\nthe session's model with one line in your `.claude/settings.local.json`\n(Claude Code v2.1.257 or later):\n\n```json\n{ \"env\": { \"CLAUDE_CODE_SUBAGENT_MODEL_FORCE\": \"1\" } }\n```\n\nIt applies to **every** pin, the three `opus` directors included: under a\nSonnet session they run on Sonnet too. `CLAUDE_CODE_SUBAGENT_MODEL` alone does\nnot do it: it applies only to agents that set no model of their own."
+};
+
 interface HelperInvocationInput extends InstalledReference {invocationEnd:number}
 function helperInvocationInputs(line:string,canonical:(value:string)=>string|undefined):HelperInvocationInput[]{
   const inputs:HelperInvocationInput[]=[];
@@ -296,7 +312,7 @@ export function adaptWorkflowText(input: string, options: WorkflowPortabilityOpt
       finding('workflow-test-schema-ported', 'info', 'Source-specific structural-test predicates were replaced with target schema and functional invocation-policy checks; behavioral verdicts remain.');
       return heading + retained + '\nValidate the supported Codex skill metadata schema and actual installed invocation policy, resolvable instruction resources, and functional operation/consent/delegation requirements. Retain source model/tool fields as provenance, not required target execution fields. Preserve substantive behavioral assertions and the original missing/malformed/verdict distinctions.\n';
     });
-    text = text.replace(/An assertion that names a literal value[^\n]*(?:\n(?!\s*\n)[^\n]*)*/gi, paragraph => {
+    text = text.replace(/An assertion that names a literal value[^\r\n]*(?:\r?\n(?![ \t]*(?:\r?\n|[-*+]\s|\d+[.)]\s|#{1,6}\s|>\s))[^\r\n]*)*/gi, paragraph => {
       if (!/(?:model:|frontmatter key|tool name)/i.test(paragraph)) return paragraph;
       finding('workflow-test-literals-ported', 'info', 'Literal platform test assertions now evaluate actual supported target behavior and keep substantive contracts.');
       return 'For a platform-specific assertion, validate the supported Codex schema, actual invocation policy and functional operation/delegation/consent contract. Preserve source literals as provenance and report the deliberate predicate change. Every substantive behavioral assertion and verdict rank remains required; removing an unsupported token alone is never a pass.';
@@ -464,16 +480,16 @@ export function adaptWorkflowText(input: string, options: WorkflowPortabilityOpt
   // Match literal source text (or its exact mapped resource spelling), outside
   // surrounding fences/frontmatter. Unknown API fixtures/imports stay unmet.
   let instructionInput=input;
-  const replaceActiveClause=(source:string,replacement:string,code:string,message:string):boolean=>{
+  const replaceActiveClause=(source:string,replacement:string,code:string,message:string,severity:Finding['severity']='warning'):boolean=>{
     let pattern=escape(source);
-    for(const path of ['CLAUDE.md','.claude/settings.local.json']){
+    for(const path of ['CLAUDE.md','.claude/settings.local.json','.claude/docs/model-tiers.md','.claude/docs/agent-teams.md']){
       const target=options.sourceToTarget?.[path];
       if(target&&target!==path)pattern=pattern.replaceAll(escape(path),'(?:'+escape(path)+'|'+escape(target)+')');
     }
     const match=new RegExp(pattern.replace(/\n/g,'\\r?\\n'),'g');let changed=false;
     instructionInput=instructionInput.replace(match,(whole,offset:number)=>{
       if(!activeClauseAt(instructionInput,offset))return whole;
-      changed=true;finding(code,'warning',message);return replacement;
+      changed=true;finding(code,severity,message);return replacement;
     });
     return changed;
   };
@@ -500,6 +516,65 @@ export function adaptWorkflowText(input: string, options: WorkflowPortabilityOpt
   replaceActiveClause(automationModeClause,
     automationModeClause.slice(4,-4).replaceAll('AskUserQuestion','the supported decision prompt')+'\n\n'+decision,
     'workflow-question-presentation-ported','The known operational mode pseudocode uses supported questions with the original mode branches, capped options, always-ask categories, decision logging and actual-answer consent.');
+
+  const readGuardTargets=[...new Set(Object.entries(options.sourceToTarget||{}).filter(([source])=>/(?:^|\/)read-guard\.sh$/.test(source)).map(([,target])=>target))];
+  const readGuard=readGuardTargets.length===1?readGuardTargets[0]:undefined;
+  const readGuardReady=!!readGuard&&/^(?!\/)(?!.*(?:^|\/)\.\.\/)[^"'\r\n:]+\.sh$/.test(readGuard)&&!!options.installedResourcePaths&&[readGuard,'codex-compat/run-helper.py','codex-compat/scripts.json'].every(path=>options.installedResourcePaths!.includes(path));
+  replaceActiveClause(runtimeSourceClauses.boundedReads,readGuardReady
+    ? '6. **Read Design Docs by Section**: retain the brief’s required heading names, bounded reads and justification for any genuinely necessary whole-file read. Before a dependent read, load `codex-compat/runtime.md` and `codex-compat/scripts.json`, verify this exact helper’s registration/hash and required runtimes, and physically resolve the document inside the actual selected project, outside the installed package. Run `python "${C2C_RESOURCE_ROOT}/codex-compat/run-helper.py" --project "${C2C_PROJECT_ROOT}" --script "'+readGuard+'" -- check "<actual-project-relative-doc>" --bounded no` using literal argv for a proposed whole-file read, or `--bounded yes` for an actual reader request with offset or limit. The helper’s exit 0 reports observations, not permission to read or a PASS: parse its guard, threshold, watched, size and bounded rows; preserve resolved configuration/default provenance and warnings. If a LARGE row is present, STOP/refuse the proposed whole-file read before calling the actual reader. Obtain headings with the same verified runner `--script "'+readGuard+'" -- sections "<actual-project-relative-doc>"`, select the required heading ranges, run the bounded preflight and use the supported actual reader with those offset and limit values. Require actual file existence/readability even when the helper returns size "-", and STOP the dependent read on missing/malformed observations, nonzero exit, failed helper registration/hash, unavailable runtime or unresolved path. The guard honors the real project’s features.read_guard and features.read_guard_kb; its source default is 40 KB, not a universal hard-coded threshold. When the original resolved setting allows a whole read, keep the original task-needs-all justification and applicable permissions. This is an explicit use-time preflight, not an automatic hook or technical interception of every tool. Do not claim enforcement or reading occurred without those actual calls.'
+    : runtimeSourceClauses.boundedReads,
+    readGuardReady?'workflow-read-guard-preflight-ported':'workflow-read-guard-route-unresolved',
+    readGuardReady?'The known section-read rule uses the registered helper observations before an actual bounded reader; LARGE or unavailable preflight stops the dependent read. No automatic interception is supplied.':'The required section-read guard has no unique preserved helper with an available registered runner route. Retain the requirement and STOP dependent reads until that route is verified.',
+    readGuardReady?'warning':'blocking');
+
+  const finiteRuntimePorts = [
+  [
+    "coordinationModels",
+    "**Key point:** source model aliases and source invocation-mode overrides are retained preferences/provenance, not active Codex model controls. An explicitly invoked or automatically selected skill uses the model selected in the actual Codex session unless a separately supported target mechanism is explicitly configured and verified. The source haiku, sonnet and opus labels do not prove target cost savings, turn-scoped overrides, agent-model selection or context capacity. Read the concrete specialist bindings, effective target configuration and current session capabilities before delegation; preserve complexity assignments and ask for a supported change when needed rather than inventing an alias mapping."
+  ],
+  [
+    "coordinationSubagents",
+    "### Subagents (supported target availability verified at use)\nUse actual supported Codex subagent delegation within the current workflow for `team-*` and orchestration skills. Verify the concrete specialist bindings, effective tool permissions, preloads, clean-context requirements and any required technical isolation before each dependent phase; source prose does not establish those controls. Run independent work sequentially or in parallel only when its inputs permit it, and collect actual results back to the parent. If required delegation/context is unavailable, STOP that dependent phase and use the documented fresh-chat handoff rather than simulating a specialist."
+  ],
+  [
+    "coordinationTeams",
+    "### Independent-session teams (source-host experimental option — inactive)\nThis separate source-host option for independent sessions is disabled in the converted collection; `team-*` skills use actual supported subagents, not this option. Read the optional agent-teams reference only when a user explicitly considers that separate capability. Do not start an independent-session team unless supported target session/task coordination, real permissions, isolation, result collection and costs have been separately configured and verified; otherwise STOP that optional workflow. This does not waive any selected skill’s actual independent-review or delegation requirement."
+  ],
+  [
+    "teamDescription",
+    "This document records an optional source-host experimental independent-session team design: separate sessions with their own context and token budgets, coordinated through a shared task list. The source feature is disabled/inactive in this converted collection; `team-*` and orchestration skills use actual supported subagents with the concrete binding preflight. The criteria below remain guidance for considering that separate option, not proof that it is implemented. Do not start a team until the user explicitly chooses it and a separately supported target setup has been verified for actual independent sessions, task coordination, permissions/isolation, result collection and costs. If any required capability is unavailable, STOP the optional team workflow without pretending that normal subagents provide its independent-session semantics."
+  ],
+  [
+    "teamAdoption",
+    "Current adoption remains unconfirmed: the source record asks that first usage be documented only when actually adopted. The converted package does not enable the source-only experimental environment opt-in or activate independent sessions. Record verified target setup and actual first usage only after the separate explicit choice and capability checks above; otherwise leave this optional feature inactive."
+  ],
+  [
+    "modelInvocation",
+    "### Source invocation/model mechanics — provenance only\n\nThe original host distinguishes typed skill calls in Manual/default and auto modes from source-tool-selected calls: source sonnet/opus overrides and haiku exceptions, source turn-scoped overrides ending at the next prompt, and source agent-model precedence describe that host only. They are not active target instructions. A skill uses the model selected in the actual Codex session, whether explicitly invoked or automatically selected, unless a supported target mechanism has been separately configured and verified. A conversational approval or follow-up does not establish a model switch. Preserve the source complexity preferences below; do not promise automatic family aliases, cheaper execution, larger context windows or a source-agent override in Codex. Before an actual delegated invocation, inspect the concrete specialist bindings and effective supported target role/session configuration, obtain any originally required user choice or permission, and verify the selected model and capabilities at use. Unavailable required model/context capability remains unmet rather than being simulated."
+  ],
+  [
+    "modelAliases",
+    "Skills and agents retain the following task-complexity tiers and source model assignments as provenance/preferences. The haiku, sonnet, opus and inherit values describe the original source taxonomy; they are not native target aliases or an automatic mapping to Codex model IDs. Use the actual supported model selected for the target session/role and verify capability before dependent work."
+  ],
+  [
+    "modelAuthoring",
+    "For source preference authoring, retain Haiku for work that only reads and formats; retain Opus for synthesis of 5+ documents with high-stakes output; retain Sonnet for other work. Every skill retains that complexity preference as provenance, using the converter’s supported metadata or an explicit instruction contract rather than adding an unsupported native model field. These assignments do not switch the actual selected target model. Apply the original constraints, quality and judgment requirements, and use a separately supported verified model choice when necessary."
+  ],
+  [
+    "agentTiers",
+    "**Agent model tiers — source preferences only.** The original inventory assigns 30 agents inherit and 19 source-specific preferences; these counts describe source metadata, not proof of effective target model configuration.\n\n- **opus (3):** `creative-director`, `producer`, `technical-director` retain that source preference. Verify the actual supported target model and context capacity for each concrete binding; no same-model, [1m] or parent-window guarantee is inferred."
+  ],
+  [
+    "agentOwnPreference",
+    "Every agent not named above retains the source inherit preference. Its preserved metadata is provenance; the effective supported target role/session configuration and actual invocation determine the model that runs. Verify those concrete bindings rather than assuming the source model line executes."
+  ],
+  [
+    "agentForceModel",
+    "Source pin/window comparisons and the source global force-model environment setting are inactive provenance, not target configuration instructions. Do not infer current cost or context window from haiku/sonnet/opus labels or promise that a child has its parent’s capacity. Check the actual target model, available context and supported role/session configuration. A delegated child starts from its bounded brief and required artifact inputs; preserve any required clean context and independent-review contract rather than assuming it inherits the parent conversation. If the required brief overflows the verified capacity, STOP the dependent invocation, reduce/restructure the brief without dropping required evidence or obtain a supported, explicitly authorized model/configuration change. Verify each affected role’s effective model, tool masks and context requirements before retrying; do not edit source settings or invent a global override, source flag equivalent, automatic savings or guaranteed context window."
+  ]
+] as const;
+  for(const [key,replacement] of finiteRuntimePorts)replaceActiveClause(runtimeSourceClauses[key],replacement,key==='coordinationSubagents'?'workflow-delegation-runtime-required':key==='coordinationTeams'||key.startsWith('team')?'workflow-optional-source-team-ported':'workflow-model-preferences-ported','A finite source runtime clause was adapted with original criteria and assignments retained; actual target capabilities must be verified at use.');
+
   const lines = instructionInput.split(/(?<=\n)/);
   const output: string[] = []; let prose = ''; let fence: { char: string; size: number } | undefined; let frontmatter = /^---\r?\n/.test(input); let frontmatterFirst = true;
   const flush = () => { if (prose) { output.push(port(prose)); prose = ''; } };

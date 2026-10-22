@@ -15,7 +15,8 @@ afterEach(async () => {
   for (const path of temporary.splice(0)) await rm(path, { recursive: true, force: true });
 });
 
-async function promptFor(content: string, supportingFiles: readonly Pick<BundleFile, 'path' | 'data'>[], active: { path: string; content: string }[] = []) {
+type TestConversionScope={selectedComponents:{kind:'skill'|'plugin';root:string;name:string}[];sourceHooks:{selected:boolean;converted:boolean};sourceHostSettingsActivated:boolean};
+async function promptFor(content: string, supportingFiles: readonly Pick<BundleFile, 'path' | 'data'>[], active: { path: string; content: string }[] = [], conversionScope?:TestConversionScope) {
   const dataRoot = await mkdtemp(join(tmpdir(), 'c2c-semantic-context-')); temporary.push(dataRoot);
   const options: ConversionOptions = { useCodex: true, dataRoot, diagnostics: { authenticated: true, codexPath: 'codex.exe', capabilities: { exec: true, pluginAdd: true, marketplaceAdd: true, pluginListJson: true, isolatedConversion: true }, findings: [] } };
   let prompt = '';
@@ -25,13 +26,31 @@ async function promptFor(content: string, supportingFiles: readonly Pick<BundleF
     if (request.files[0].path === 'skills/design-system/SKILL.md') prompt = current;
     return { stdout: Buffer.from(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify({ files: [{ path: request.files[0].path, edits: [] }], findings: [{ code: 'source-workflow', severity: 'blocking', message: 'Source workflow needs review.' }] }) } })), stderr: '', exitCode: 0 };
   });
-  const input = { files: [{ path: 'skills/design-system/SKILL.md', content }, ...active], findings: [], supportingFiles };
+  const input = { files: [{ path: 'skills/design-system/SKILL.md', content }, ...active], findings: [], supportingFiles, conversionScope };
   await adaptWithCodex(input, options);
   const selected = JSON.parse(prompt.split('Material a converter:\n')[1]).supportingContext;
   expect(selected).toBeDefined();
   return { prompt, context: selected };
 }
 const support = (path: string, content: string | Buffer) => ({ path, data: typeof content === 'string' ? Buffer.from(content) : content });
+
+it.each([
+  {selectedComponents:[{kind:'skill' as const,root:'.claude/skills/design-system',name:'design-system'},{kind:'skill' as const,root:'.claude/skills/review',name:'review'}],sourceHooks:{selected:false,converted:false},sourceHostSettingsActivated:false},
+  {selectedComponents:[{kind:'plugin' as const,root:'packages/studio',name:'studio'}],sourceHooks:{selected:true,converted:false},sourceHostSettingsActivated:false}
+])('transmite ao pedido semântico o escopo explícito sem inferi-lo do nome ou conteúdo do recurso',async conversionScope=>{
+  const mixed='## modes.review_mode\nApply the selected skill behavior.\n## Source host integration\nAutomatic lifecycle interception described by the source host.';
+  const {prompt}=await promptFor('Read [mixed settings](../../source-context/.claude/docs/effects-map.md).',[support('source-context/.claude/docs/effects-map.md',mixed)],[],conversionScope);
+  const request=JSON.parse(prompt.split('Material a converter:\n')[1]);
+  expect(request.conversionScope).toEqual(conversionScope);
+  expect(request.supportingContext.files).toEqual(expect.arrayContaining([expect.objectContaining({path:'source-context/.claude/docs/effects-map.md',content:mixed})]));
+});
+
+it('não inventa escopo ou ativa settings quando o chamador não fornece conversionScope',async()=>{
+  const {prompt}=await promptFor('Review this workflow without an inferred source integration.',[]);
+  const request=JSON.parse(prompt.split('Material a converter:\n')[1]);
+  expect(request.conversionScope).toBeUndefined();
+  expect(request).not.toHaveProperty('conversionScope');
+});
 
 it('retains generated runtime and evaluation contracts before large source dependencies consume the budget',()=>{
   const references=Array.from({length:20},(_,i)=>'source-context/reference-'+i+'.md');
