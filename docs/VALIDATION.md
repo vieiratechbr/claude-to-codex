@@ -301,3 +301,23 @@ As regras de leitura usam o helper registrado, suas observações e o leitor efe
 O `read-guard.sh` convertido da revisão atual passou em seis casos funcionais: LARGE antes de leitura integral, leitura delimitada, índice de seções sem cabeçalhos de exemplos cercados, override local desligado, limite inválido com fallback/proveniência e arquivo ausente. Todos os recursos do pacote permaneceram iguais por hash. Relatório `.cache/studios-read-guard-ZTgIBe/report.json`. Os 43 shells efetivamente usados já passaram em sintaxe/registro, em `.cache/studios-current-syntax-BpNDc7/report.json`; esses resultados não executam 74 tarefas de jogo.
 
 A rodada anterior terminou com configuração pessoal igual e sem cópia temporária de `auth.json` restante. Sua tentativa de cancelamento e limpeza manual foi recusada pela revisão automática com “blocked by policy”; o fluxo normal encerrou e removeu as credenciais. A rodada corrigida tem sete documentos compartilhados para adaptação. Seu resultado, instalação integral e publicação precisam ser registrados após a conclusão.
+
+
+### Build final da beta.3
+
+[CI Windows 39764991021](https://github.com/vieiratechbr/claude-to-codex/actions/runs/39764991021), commit `ccf1bbfa1688f31eeee898e8f5728bfdc176dd66`: **success**. Passaram tipos, **466 testes** (dois testes opcionais executados separadamente), dois testes nativos isolados, quatro fluxos desktop, build NSIS, janela empacotada e compilação da prévia do instalador sem instalação. Artifact `Windows-installer`, ID `12420310617`, ZIP SHA-256 `c0f831bdbe6cdb125f7263a621c075dfcf2454e9e86495ebed5c88fa72624b9a`.
+
+No mesmo código, tipos e 466 testes passaram localmente; o NSIS foi gerado e a janela empacotada abriu em perfil temporário. O ASAR declara `0.3.0-beta.3`, conserva a licença MIT e exclui artefatos de desenvolvimento. A publicação usará o artefato da CI acima, com igualdade dos arquivos da aplicação verificada pelo publisher. Nenhum NSIS foi instalado sobre o aplicativo pessoal nesta validação.
+
+
+### Linha de chegada e resultado da coleção — 22/10/2026
+
+Auditoria de finalização: aquisição/inventário, conversão, instalação/recuperação, histórico, atualização e interface já estavam implementados. O histórico recente foi reaproveitado; não houve nova implementação ou refatoração nesta finalização. A compilação não tinha pendência crítica. As pendências importantes eram concluir a conversão assistida, verificar a instalação integral e publicar o instalador aprovado. Melhorias de interface, novas integrações e refatorações ficam fora desta entrega.
+
+A conversão assistida da revisão `05ad7c8a5b8aa2aa86bbd3439ae7cf7295cac418` terminou com **passed: true**, **installable: true**, **zero impedimentos**, **zero links locais ausentes** e validação estrutural vazia. Preservou **724 arquivos, 74 skills individuais e uma chamada geral, 49 especialistas, 43 helpers registrados e 123 especificações**. As cinco políticas manuais são `day-one-patch`, `dev-story`, `hotfix`, `launch-checklist` e `story-done`. Configuração pessoal permaneceu igual; nenhuma cópia temporária de autenticação restou. Relatório local `.cache/game-studios-qa-e0vcgH/report.json`.
+
+A instalação real no Codex, em `CODEX_HOME` descartável, passou no registro, ativação, origem, versão, Python e hashes dos **724 arquivos**. O `skills/list` nativo anunciou **75 chamadas**, sem chamadas ausentes ou extras. A remoção concluiu e uma nova listagem retornou zero skills desse pacote. A configuração pessoal permaneceu igual. Relatório `.cache/studios-native-independent-QmLhNI/report.json`. A chamada geral gerada é `$donchitos-claude-code-game-studios`; a interface permite copiar a chamada anunciada pelo Codex.
+
+Os 43 helpers finais são byte a byte idênticos aos da conferência de sintaxe/registro já aprovada; o resultado foi reaproveitado sem repetir os testes. Os testes funcionais de helpers e Godot estão registrados acima. A revisão independente dos últimos documentos preservou alternativas, consentimento, modos, gates, checkpoints, recuperação e avaliação de agentes.
+
+O pacote conserva avisos de adaptação e de requisitos no uso; zero impedimentos não significa zero avisos. Especialistas dependem de configuração e descoberta efetivas, e funções sem controle real devem parar. As 123 especificações foram preservadas e conferidas como dados, **não executadas como 123 testes de jogo**. Não foram executadas 74 tarefas reais nem projetos Unity/Unreal. Não se afirma compatibilidade universal ou aprovação de toda integração externa.

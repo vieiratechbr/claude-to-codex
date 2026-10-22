@@ -2,6 +2,16 @@
 
 Origem fixada: [Donchitos/Claude-Code-Game-Studios, be8993b](https://github.com/Donchitos/Claude-Code-Game-Studios/tree/be8993bbc5a1f016bc770b2846ce06272d284526). Esta revisão contém 585 arquivos, 74 skills e 49 definições de especialistas. Fixar a revisão permite distinguir regressões do conversor de mudanças posteriores na origem.
 
+## Revisão da beta.3
+
+A conferência final usou `05ad7c8a5b8aa2aa86bbd3439ae7cf7295cac418`: 638 arquivos de origem, 74 skills, 49 especialistas e 123 especificações. Para reproduzir essa revisão:
+
+```powershell
+npm run test:game-studios -- --revision 05ad7c8a5b8aa2aa86bbd3439ae7cf7295cac418 --assist
+```
+
+Os comandos sem `--revision` abaixo conservam a revisão original como baseline. Ao reutilizar snapshot, bundle ou cache da revisão nova, informe também o mesmo `--revision`.
+
 ## Reproduzir a conversão
 
 Com Node.js 24+, dependências do projeto e Git disponíveis:
