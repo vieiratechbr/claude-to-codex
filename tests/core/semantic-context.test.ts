@@ -33,6 +33,18 @@ async function promptFor(content: string, supportingFiles: readonly Pick<BundleF
 }
 const support = (path: string, content: string | Buffer) => ({ path, data: typeof content === 'string' ? Buffer.from(content) : content });
 
+it('retains generated runtime and evaluation contracts before large source dependencies consume the budget',()=>{
+  const references=Array.from({length:20},(_,i)=>'source-context/reference-'+i+'.md');
+  const contracts=[support('codex-compat/runtime.md','Explicit project runtime.'),support('codex-compat/evaluation.md','Approved live catalog fork and target predicates.')];
+  const selected=selectSemanticContext({path:'skills/skill-test/SKILL.md',content:references.map(path=>'Read `'+path+'`.').join('\n')},[
+    ...references.map(path=>support(path,'source detail '.repeat(1500))),...contracts
+  ],['skills/skill-test/SKILL.md']);
+  expect(selected.files.slice(0,2).map(f=>f.path)).toEqual(contracts.map(f=>f.path));
+  expect(selected.files.slice(0,2).every(f=>!f.truncated)).toBe(true);
+  expect(selected.totalBytes).toBeLessThanOrEqual(48*1024);
+  expect(selected.omittedCount).toBeGreaterThan(0);
+});
+
 it('exposes linked references, local scripts and named active auxiliary skills as read-only context', async () => {
   const target = 'Read [workflow](references/workflow.md). Use /slides:create and visual-brand-system.';
   const active = [

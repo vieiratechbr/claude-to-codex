@@ -45,7 +45,11 @@ function dependencies(file: { path: string; content: string }): string[] {
 }
 export function selectSemanticContext(target: { path: string; content: string }, supporting: readonly SupportingFile[], activeSkillPaths: readonly string[]) {
   const available = new Map(supporting.map(file => [file.path, file]));
-  const queued = dependencies(target), aliases: string[] = []; const seen = new Set<string>([target.path]);
+  // Generated execution/evaluation contracts govern the port, even when the
+  // source never named them. Preserve them before bulky source references can
+  // exhaust the bounded context; they remain read-only supporting evidence.
+  const contracts=['codex-compat/runtime.md','codex-compat/evaluation.md'].filter(path=>available.has(path));
+  const queued = [...contracts,...dependencies(target)], aliases: string[] = []; const seen = new Set<string>([target.path]);
   for (const path of activeSkillPaths) {
     if (path === target.path) continue;
     const name = path.split('/').at(-2)!;

@@ -15,6 +15,30 @@ const escape=(value:string)=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 // Match complete resource names, including Unicode letters and combining marks;
 // an ASCII word boundary can turn a longer project path into a package lookup.
 const pathBefore='(?<![\\p{L}\\p{N}\\p{M}_/.-])',pathAfter='(?![\\p{L}\\p{N}\\p{M}_/.-])';
+/** Expand only actual Markdown preparation syntax, never literal examples. */
+function dynamicPreparations(text:string,replace:(command:string)=>string):string{
+  let fence:{char:string;length:number}|undefined;
+  return text.split(/(\r?\n)/).map((line,index)=>{
+    if(index%2)return line;
+    const marker=/^[ \t]*(`{3,}|~{3,})(.*)$/.exec(line);
+    if(fence){if(marker&&marker[1][0]===fence.char&&marker[1].length>=fence.length&&!marker[2].trim())fence=undefined;return line;}
+    if(marker){fence={char:marker[1][0],length:marker[1].length};return line;}
+    let output='';
+    const escaped=(at:number)=>{let slashes=0;for(let n=at-1;n>=0&&line[n]==='\\';n--)slashes++;return slashes%2===1;};
+    for(let at=0;at<line.length;){
+      if(line[at]==='!'&&!escaped(at)&&line[at+1]==='`'&&line[at+2]!=='`'){
+        const close=/(?<!`)`(?!`)/g;close.lastIndex=at+2;const end=close.exec(line);
+        if(end&&!escaped(end.index)&&end.index>at+2){output+=replace(line.slice(at+2,end.index));at=end.index+1;continue;}
+      }
+      if(line[at]==='`'&&!escaped(at)){
+        const ticks=/^`+/.exec(line.slice(at))![0],close=new RegExp('(?<!`)'+ticks+'(?!`)','g');close.lastIndex=at+ticks.length;const end=close.exec(line);
+        if(end){output+=line.slice(at,end.index+ticks.length);at=end.index+ticks.length;continue;}
+      }
+      output+=line[at++];
+    }
+    return output;
+  }).join('');
+}
 export function isInstructionResource(file:Pick<BundleFile,'path'|'sourcePath'>):boolean{
   return !!file.sourcePath&&/\.md$/i.test(file.path)&&!/(?:^|\/)(?:assets|templates?|fixtures)(?:\/|$)/i.test(file.path)&&(/^skills\/[^/]+\//.test(file.path)||/^source-context\//.test(file.path)&&!/(?:^|\/)(?:README|CHANGELOG|LICENSE|NOTICE)(?:\.md)?$/i.test(file.path));
 }
@@ -109,7 +133,7 @@ export function prepareWorkflowResources(snapshot:SourceSnapshot,files:Map<strin
       }
       return fence+language+'\n'+program+'\n'+fence;
     });
-    text=text.replace(/!`([^`\n]+)`/g,(_whole,original:string)=>{
+    text=dynamicPreparations(text,(original:string)=>{
       let command=original;
       command=command.replace(/^bash\s+"\$\{C2C_RESOURCE_ROOT\}\/([^"\n]+)"(?:\s+([\s\S]*))?$/,(whole,path:string,args:string)=>scripts.adaptedPaths.includes(path)?'python "${C2C_RESOURCE_ROOT}/codex-compat/run-helper.py" --project "${C2C_PROJECT_ROOT}" --script "'+path+'" -- '+(args||''):whole);
       changedPreparation=true;return '\nBefore using the following context, load the runtime contract, select the actual project, and execute this preparation only at skill-use time under session permissions. Capture the real output; if unavailable, report the unmet requirement and do not fabricate values. Never execute it during download or conversion.\n\n```sh\n'+command+'\n```\n';

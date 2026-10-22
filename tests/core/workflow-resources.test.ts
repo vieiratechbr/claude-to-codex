@@ -18,6 +18,17 @@ function fixture(){
   put('skills/probe/SKILL.md',snapshot.files[0].data,snapshot.files[0].path);put('source-context/.claude/hooks/probe.sh',snapshot.files[1].data,snapshot.files[1].path);
   return{snapshot,files,put};
 }
+it('expande preparação ativa sem transformar exemplos cercados ou inline em comandos',()=>{
+ const f=fixture(),entry=f.files.get('skills/probe/SKILL.md')!;
+ const examples=['````markdown','!`fenced-example`','```sh','!`nested-example`','```','````','~~~text','!`tilde-example`','~~~','The syntax is `` !`inline-example` ``.','Escaped: \\!`escaped-example`.'];
+ f.put(entry.path,examples.join('\n')+'\n!`actual-preparation`\n',entry.sourcePath);
+ const findings:Finding[]=[];
+ prepareWorkflowResources(f.snapshot,f.files,f.put,findings);
+ const result=f.files.get(entry.path)!.data.toString();
+ for(const example of ['!`fenced-example`','!`nested-example`','!`tilde-example`','`` !`inline-example` ``','\\!`escaped-example`'])expect(result).toContain(example);
+ expect(result).toContain('```sh\nactual-preparation\n```');
+ expect(result.match(/Before using the following context/g)).toHaveLength(1);
+});
 it('converte o fechamento operacional sem executar documentos históricos ou fixtures de avaliação',()=>{
  const f=fixture();
  const sources:Record<string,string>={

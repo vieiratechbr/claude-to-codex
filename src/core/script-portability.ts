@@ -14,6 +14,36 @@ const LOCATION=/(?:\b(?:dirname|realpath|readlink)[^\n]*(?:BASH_SOURCE|\$0)|\$\{
 const escape=(value:string)=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const shellLiteral=(value:string)=>"'"+value.replace(/'/g,"'\\''")+"'";
 
+type SourceInventoryKind='observations'|'compatibility';
+/** These scanners interpret Claude's folder layout AND metadata semantics.
+ * Selecting a game project does not make them native Codex auditors. Recognize
+ * only the supported structural contracts, not their names or prose mentions.
+ */
+function sourceFormatInventory(text:string):SourceInventoryKind|undefined {
+  const agents=/\bagent_dir\s*=\s*os\.path\.join\(root,\s*["']\.claude["'],\s*["']agents["']\)/.test(text);
+  const skills=/\bskill_dir\s*=\s*os\.path\.join\(root,\s*["']\.claude["'],\s*["']skills["']\)/.test(text);
+  if(agents&&skills&&/\bdef\s+frontmatter\s*\(/.test(text)&&/AGENTS:/.test(text)&&/DELEGATION:/.test(text))return 'observations';
+  const claude=/\bclaude\s*=\s*os\.path\.join\(root,\s*["']\.claude["']\)/.test(text);
+  const children=/\bskill_dir\s*=\s*os\.path\.join\(claude,\s*["']skills["']\)/.test(text)&&/\bagent_dir\s*=\s*os\.path\.join\(claude,\s*["']agents["']\)/.test(text);
+  if(claude&&children&&/\bSKILL_PORTABLE\s*=/.test(text)&&/\bSKILL_VARS\s*=/.test(text)&&/FILES:/.test(text)&&/COUNT:/.test(text))return 'compatibility';
+  return undefined;
+}
+function sourceInventoryGuard(kind:SourceInventoryKind):string {
+  const heading=kind==='observations'?'Observations':'Compatibility';
+  const procedure=[
+    'The optional source-format scanner expects .claude/skills and .claude/agents and interprets source metadata; it cannot audit advertised Codex resources.',
+    'Read-only target procedure: enumerate the actual advertised SKILL.md paths and preserved specialist bindings or actual native role registry. Bind every requested name to its exact path; keep checked/total counts, missing names and unreadable resources explicit.',
+    'Read each target instruction and applicable references. Report file-backed delegation briefs, boundaries and description overlap as observations, without changing structural verdicts or inventing a clean result.',
+    'Inspect actual native model, tool, preload and isolation contracts separately from historical source preferences. Unverified or unavailable required controls are NOT ASSESSED or BLOCKED, never a pass inferred from metadata.',
+    'Source construct names, line numbers and counts are provenance only. Compatibility requires checking each substantive target operation; an unavailable auxiliary scanner is not evidence that those operations passed.',
+    'Do not edit project, advertised target or installed resources during this audit. Preserve the workflow\'s original approval gates; this optional not-run fallback does not approve installation, writes or dependent execution.'
+  ];
+  return ['# C2C source-format inventory fallback v1',
+    'printf \'%s\\n\' '+shellLiteral(heading+': not run (source-format scanner has no verified native Codex inventory adapter)'),
+    ...procedure.map(line=>'printf \'%s\\n\' '+shellLiteral(line)+' >&2'),
+    'return 2 2>/dev/null || exit 2',''].join('\n');
+}
+
 /** Prove the narrow directory-anchor contract used by split project/resource
  * helpers. Ancestor cd selects the caller's project; every other use must be
  * a mapped installed file consumed by a recognized read/import operation.
@@ -109,8 +139,11 @@ export function adaptProjectScripts(files:Map<string,BundleFile>,put:Put,finding
   for(const file of mapped.filter(f=>/\.(?:sh|bash)$/.test(f.path))){
     const guard=projectGuard(file.path);
     const alreadyGuarded=file.data.toString().includes(guard);
-    const directoryAnchors=sharedDirectoryAnchors(file.data.toString().replace(guard,''),file,mapped);
+    const source=file.data.toString().replace(guard,'').replace(sourceInventoryGuard('observations'),'').replace(sourceInventoryGuard('compatibility'),'');
+    const directoryAnchors=sharedDirectoryAnchors(source,file,mapped);
     const original=directoryAnchors.text;
+    const inventoryKind=sourceFormatInventory(original);
+    const inventoryGuard=inventoryKind?sourceInventoryGuard(inventoryKind):'';
     const sourceRootSelector=/^[ \t]*--root\)[^\n]*\bROOT_ARG="\$2"/m.test(original)
       ||/^[ \t]*--root=\*\)[^\n]*\bROOT_ARG="\$\{1#--root=\}"/m.test(original);
     let unresolved=false,rewrites=0;
@@ -147,7 +180,7 @@ export function adaptProjectScripts(files:Map<string,BundleFile>,put:Put,finding
       // The injected guard shifts original lines after the shebang, so retain
       // those existing ranges instead of accidentally printing guard code.
       if(!alreadyGuarded){
-        const shift=guard.split('\n').length-1;
+        const shift=guard.split('\n').length-1+(inventoryGuard?inventoryGuard.split('\n').length-1:0);
         line=line.replace(/sed[ \t]+-n[ \t]+(["'])(\d+),(\d+|\/[^"'\n]+\/)p\1[ \t]+"\$0"/g,(match,quote,start,end)=>{
           if(Number(start)<(original.startsWith('#!')?2:1))return match;
           return 'sed -n '+quote+(Number(start)+shift)+','+(/^\d+$/.test(end)?Number(end)+shift:end)+'p'+quote+' "$0"';
@@ -168,8 +201,9 @@ export function adaptProjectScripts(files:Map<string,BundleFile>,put:Put,finding
       continue;
     }
     const split=body.indexOf('\n');
-    const adapted=body.startsWith('#!')?body.slice(0,split+1)+guard+body.slice(split+1):guard+body;
+    const adapted=body.startsWith('#!')?body.slice(0,split+1)+guard+inventoryGuard+body.slice(split+1):guard+inventoryGuard+body;
     put(file.path,adapted,file.sourcePath,true);
+    if(inventoryKind)findings.push({code:'source-inventory-target-audit-required',severity:'warning',file:file.path,message:'Scanner auxiliar no formato Claude preservado como origem; sua execução retorna not run (exit 2), pois pastas e metadados de origem não auditam o Codex. O procedimento de uso exige observações nativas somente leitura a partir dos caminhos efetivamente anunciados e dos bindings, com contagens checked/total e controles não comprovados como NOT ASSESSED/BLOCKED. Esse fallback opcional não aprova operações nem bloqueia a instalação por si só.'});
     report.adaptedPaths.push(file.path);report.resourceRewrites+=rewrites;
   }
   return report;

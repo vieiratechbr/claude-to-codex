@@ -7,8 +7,22 @@ import {spawnSync} from 'node:child_process';
 import type {BundleFile,Finding} from '../../src/shared/contracts';
 import {adaptProjectScripts} from '../../src/core/script-portability';
 
-const bash=process.env.C2C_TEST_BASH || (process.platform==='win32'
-  ?join(process.env.USERPROFILE! ,'.cache/codex-runtimes/codex-primary-runtime/dependencies/native/git/usr/bin/sh.exe'):'bash');
+function verifiedTestBash():string {
+  const override=process.env.C2C_TEST_BASH;
+  const gitRoots=process.platform==='win32'?[process.env.ProgramW6432,process.env.ProgramFiles,process.env['ProgramFiles(x86)']].filter((p):p is string=>!!p).map(p=>join(p,'Git')):[];
+  if(process.platform==='win32'&&process.env.LOCALAPPDATA)gitRoots.push(join(process.env.LOCALAPPDATA,'Programs/Git'));
+  const bundled=process.env.USERPROFILE?join(process.env.USERPROFILE,'.cache/codex-runtimes/codex-primary-runtime/dependencies/native/git/usr/bin/sh.exe'):undefined;
+  const candidates=override?[override]:process.platform==='win32'
+    ?[...new Set(gitRoots.flatMap(root=>[join(root,'usr/bin/bash.exe'),join(root,'bin/bash.exe')])),...(bundled?[bundled]:[])]:['bash'];
+  const failures:string[]=[];
+  for(const candidate of candidates){
+    const probe=spawnSync(candidate,['--version'],{encoding:'utf8',timeout:5000,windowsHide:true});
+    if(probe.status===0&&/GNU bash\b/.test(probe.stdout||''))return candidate;
+    failures.push(candidate+': '+(probe.error?.message||'not GNU Bash (exit '+probe.status+')'));
+  }
+  throw new Error((override?'C2C_TEST_BASH must name an available GNU Bash executable. ':'GNU Bash is required; install Git for Windows or set C2C_TEST_BASH. ')+failures.join('; '));
+}
+const bash=verifiedTestBash();
 const cleanup:string[]=[];
 afterEach(async()=>{await Promise.all(cleanup.splice(0).map(p=>rm(p,{recursive:true,force:true})));});
 function bundle(entries:Record<string,string>){
@@ -25,8 +39,12 @@ async function fixture(entries:Record<string,string>){
   await Promise.all([install,project,other].map(p=>mkdir(p,{recursive:true})));
   const result=bundle(entries);
   for(const file of result.files.values()){const dest=join(install,file.path);await mkdir(dirname(dest),{recursive:true});await writeFile(dest,file.data);}
-  const run=(source:string,args:string[]=[],rootEnv:string|undefined=project,cwd=other,runtimeEnv:NodeJS.ProcessEnv={})=>spawnSync(bash,[join(install,'source-context',source),...args],{
-    cwd,encoding:'utf8',env:{...process.env,C2C_PROJECT_ROOT:rootEnv,PATH:dirname(bash)+delimiter+process.env.PATH,...runtimeEnv},timeout:5000,input:''});
+  const run=(source:string,args:string[]=[],rootEnv:string|undefined=project,cwd=other,runtimeEnv:NodeJS.ProcessEnv={})=>{
+    const result=spawnSync(bash,[join(install,'source-context',source),...args],{
+      cwd,encoding:'utf8',env:{...process.env,C2C_PROJECT_ROOT:rootEnv,PATH:dirname(bash)+delimiter+process.env.PATH,...runtimeEnv},timeout:5000,input:'',windowsHide:true});
+    if(result.error)throw new Error('Could not run converted script '+source+' with verified GNU Bash '+bash+': '+result.error.message,{cause:result.error});
+    return result;
+  };
   return {root,install,project,other,...result,run};
 }
 
@@ -234,4 +252,43 @@ it('does not rewrite a project path that merely ends with a mapped resource name
 it('keeps self-reading help ranges on original documentation after adding the guard',async()=>{
   const f=await fixture({'.claude/scripts/help.sh':'#!/bin/bash\n# Useful help\n# use --dry-run\n\nif [ "${1:-}" = --help ]; then sed -n "2,3p" "$0" | sed "s/^# //"; exit 0; fi\n'});
   const out=f.run('.claude/scripts/help.sh',['--help']);expect(out.status,out.stderr).toBe(0);expect(out.stdout).toBe('Useful help\nuse --dry-run\n');
+});
+
+it.each(['observations','compatibility'] as const)('does not audit source folders as native %s when advertised Codex resources exist elsewhere',async kind=>{
+  // Removing the source-format guard would inspect an empty or shadow .claude
+  // tree and falsely report observations about that tree as the target audit.
+  const scanner=kind==='observations'?`agent_dir = os.path.join(root, ".claude", "agents")
+skill_dir = os.path.join(root, ".claude", "skills")
+def frontmatter(text):
+    return {}
+print("AGENTS: 0  SKILLS: 0  DELEGATION: none")`:`claude = os.path.join(root, ".claude")
+skill_dir = os.path.join(claude, "skills")
+agent_dir = os.path.join(claude, "agents")
+SKILL_PORTABLE = {"name", "description"}
+SKILL_VARS = {"CLAUDE_SKILL_DIR"}
+print("FILES: skills=0 agents=0  COUNT: questions=0")`;
+  const source='#!/bin/bash\nROOT="$(cd "$(dirname "$0")/../.." && pwd)"\npython - "$ROOT" <<\'PYEOF\'\nimport os, sys\nroot = sys.argv[1]\n'+scanner+'\nPYEOF\nprintf false-clean > scanner-ran.txt\n';
+  const f=await fixture({'.claude/scripts/inspect-targets.sh':source});
+  const nativeSkill=join(f.project,'.agents/skills/native-design/SKILL.md'),nativeRole=join(f.other,'roles/native-reviewer.toml');
+  await Promise.all([mkdir(dirname(nativeSkill),{recursive:true}),mkdir(dirname(nativeRole),{recursive:true})]);
+  await writeFile(nativeSkill,'---\nname: native-design\ndescription: Native target\n---\nRead and compare design.\n');
+  await writeFile(nativeRole,'name = "native-reviewer"\ndeveloper_instructions = "Review only"\n');
+  await writeFile(join(f.project,'advertised-targets.json'),JSON.stringify({skills:[{name:'native-design',path:nativeSkill}],roles:[{name:'native-reviewer',path:nativeRole}]}));
+  const beforeSkill=await readFile(nativeSkill),beforeRole=await readFile(nativeRole);
+  expect(existsSync(join(f.project,'.claude'))).toBe(false);
+  for(const shadow of [false,true]){
+    if(shadow){await mkdir(join(f.project,'.claude/agents'),{recursive:true});await writeFile(join(f.project,'.claude/agents/shadow.md'),'wrong source-format agent');}
+    const out=f.run('.claude/scripts/inspect-targets.sh');
+    expect(out.status,out.stderr).toBe(2);
+    expect(out.stdout).toMatch(kind==='observations'?/^Observations: not run \(/:/^Compatibility: not run \(/);
+    expect(out.stdout).not.toContain('AGENTS: 0');expect(out.stdout).not.toContain('COUNT: questions=0');
+    expect(out.stderr).toContain('advertised');expect(out.stderr).toContain('checked/total');expect(out.stderr).toContain('NOT ASSESSED');
+    expect(existsSync(join(f.project,'scanner-ran.txt'))).toBe(false);
+  }
+  expect(await readFile(nativeSkill)).toEqual(beforeSkill);expect(await readFile(nativeRole)).toEqual(beforeRole);
+  expect(f.findings.filter(x=>x.code==='source-inventory-target-audit-required')).toHaveLength(1);
+  expect(f.findings.some(x=>x.severity==='blocking')).toBe(false);
+  const adapted=f.files.get('source-context/.claude/scripts/inspect-targets.sh')!.data.toString();
+  adaptProjectScripts(f.files,(path,data,sourcePath)=>f.files.set(path,{path,data:Buffer.from(data),sourcePath,sha256:''}),[]);
+  expect(f.files.get('source-context/.claude/scripts/inspect-targets.sh')!.data.toString()).toBe(adapted);
 });

@@ -47,6 +47,91 @@ function instructionWrite(line:string,isResource?:(value:string)=>boolean):boole
 }
 
 interface InstalledReference {path:string;start:number;end:number}
+function activeClauseAt(text:string,offset:number):boolean{
+  let fence:{char:string;size:number}|undefined,frontmatter=/^---\r?\n/.test(text),first=true;
+  for(const line of text.slice(0,offset).split(/\r?\n/)){
+    if(frontmatter){if(!first&&/^---\s*$/.test(line))frontmatter=false;first=false;continue;}
+    const marker=/^[ \t]*([`]{3,}|~{3,})(.*)$/.exec(line);
+    if(!marker)continue;
+    if(!fence)fence={char:marker[1][0],size:marker[1].length};
+    else if(marker[1][0]===fence.char&&marker[1].length>=fence.size&&!marker[2].trim())fence=undefined;
+  }
+  return !fence&&!frontmatter&&!/^\s*>/.test(text.slice(text.lastIndexOf('\n',offset-1)+1,offset));
+}
+const engineReferenceWriteClause=[
+  'In the same CLAUDE.md write, set the **Engine Version Reference** import to the',
+  'chosen engine. Find the line marked `ENGINE-REFERENCE-IMPORT` (an',
+  '`@docs/engine-reference/<engine>/VERSION.md` line under its comment) and Edit it',
+  'to point at the configured engine:',
+  '- Godot → `@docs/engine-reference/godot/VERSION.md`',
+  '- Unity → `@docs/engine-reference/unity/VERSION.md`',
+  '- Unreal → `@docs/engine-reference/unreal/VERSION.md`','',
+  'This keeps a Unity or Unreal project from loading the Godot reference in every',
+  'session. It is idempotent — re-running `/setup-engine` for a different',
+  'engine rewrites the same line. (The target `docs/engine-reference/<engine>/`',
+  'directory is created in Section 7, Populate Engine Reference Docs, if it does not yet exist.)'
+].join('\n');
+const engineReferenceVerifyClause=[
+  '## 8. Verify the CLAUDE.md Import','',
+  '**This import was already written in Section 4 — do not edit it again and do not',
+  'ask again.** Section 4 sets it as part of the same CLAUDE.md write, anchored to',
+  'the `ENGINE-REFERENCE-IMPORT` marker. This step only confirms the result.','',
+  'Read `CLAUDE.md` and confirm the line under the marker reads:','',
+  '```markdown','@docs/engine-reference/<engine>/VERSION.md','```','',
+  'with `<engine>` the engine just configured. If it still points at a different',
+  'engine, Section 4 did not complete — go back and finish it rather than patching',
+  'the line here.','',
+  '> **Why this is a check and not a second write.** Repeating the edit here with',
+  '> its own approval prompt would ask the user twice for one change, and the second',
+  '> ask would be for work already done. Locate the line by its marker, never by the',
+  '> `## Engine Version Reference` heading — the marker exists precisely so the line',
+  '> can still be found when the heading moves or is reworded.'
+].join('\n');
+const automationModeClause=[
+  '```','At each decision point in this skill:','',
+  '1. Classify the decision: major or minor (see §Major vs Minor above).',
+  '2. Check whether the decision falls into an `automation_always_ask`',
+  '   category: scope_changes, file_deletions, schema_changes,',
+  '   architecture_decisions, version_bumps, external_calls.',
+  '3. Apply the mode rule:','',
+  '   collaborative:           AskUserQuestion always.',
+  '   guided + major:          AskUserQuestion with capped options + recommendation.',
+  '   guided + minor:          State recommendation inline, proceed.',
+  '   autonomous + always_ask: AskUserQuestion (regardless of mode).',
+  '   autonomous + other:      Pick recommended, log via log_decision, proceed.',
+  '4. If the question comes back skipped, dismissed or empty, it is not an',
+  '   answer: see §Every mode: a question with no answer.','```'
+].join('\n');
+interface HelperInvocationInput extends InstalledReference {invocationEnd:number}
+function helperInvocationInputs(line:string,canonical:(value:string)=>string|undefined):HelperInvocationInput[]{
+  const inputs:HelperInvocationInput[]=[];
+  // The runner and --script operand are executable inputs, even when prose
+  // introduces the invocation with "after writing" or "save them: run".
+  // Exempt only these exact token spans; helper arguments and later commands
+  // still participate in ordinary immutable-resource mutation checks.
+  for(const command of line.matchAll(/\b(?:python(?:3(?:\.\d+)?)?(?:\.exe)?|py(?:\.exe)?)(?:\s+-3(?:\.\d+)?)?\s+("[^"\n]+"|'[^'\n]+'|[^\s;|&`]+)(?=\s|`|$)/g)){
+    if(canonical(command[1])!=='codex-compat/run-helper.py')continue;
+    const runnerStart=command.index!+command[0].lastIndexOf(command[1]),argsStart=command.index!+command[0].length;
+    const args=/^[^;&|`\n]*/.exec(line.slice(argsStart))![0],invocationEnd=argsStart+args.length;
+    inputs.push({path:'codex-compat/run-helper.py',start:runnerStart,end:runnerStart+command[1].length,invocationEnd});
+    const tokens=[...args.matchAll(/(?:[^\s"';&|`]+|"[^"\n]*"|'[^'\n]*')+/g)];
+    for(let index=0;index<tokens.length;index++){
+      const token=tokens[index],flag=token[0];
+      if(flag==='--')break;
+      if(flag==='--project'){index++;continue;}
+      if(flag.startsWith('--project='))continue;
+      let value:string,start:number;
+      if(flag==='--script'){
+        const operand=tokens[++index];if(!operand)break;
+        value=operand[0];start=argsStart+operand.index!;
+      }else if(flag.startsWith('--script=')){
+        value=flag.slice('--script='.length);start=argsStart+token.index!+'--script='.length;
+      }else break;
+      const path=canonical(value);if(path)inputs.push({path,start,end:start+value.length,invocationEnd});
+    }
+  }
+  return inputs;
+}
 function installedResourceChecks(text:string,options:WorkflowPortabilityOptions):{writes:string[];staleReads:string[]}{
   const known=new Set([...Object.values(options.sourceToTarget||{}),options.targetPath,...options.requiredMutableResources||[]]);
   const linkedTargets=new Set([...known,...options.installedResourcePaths||[]]);
@@ -87,6 +172,7 @@ function installedResourceChecks(text:string,options:WorkflowPortabilityOptions)
     }
     for(const match of line.matchAll(/(?<![\w/.-])(?:\$\{?C2C_RESOURCE_ROOT\}?\/|(?:\.\.\/)*(?:source-context|codex-compat|skills)\/)[\p{L}\p{N}_.@%/+${}-]+/gu))add(match[0],match.index!);
     const complete=refs.filter(ref=>!refs.some(other=>other!==ref&&other.start<=ref.start&&other.end>ref.end));
+    const invocationInputs=helperInvocationInputs(line,canonical);
     for(const ref of complete){
       const before=line.slice(0,ref.start).split(/[.!?;](?=\s|$)/).at(-1)||'',after=line.slice(ref.end);
       // A past participle may describe a different output ("the written code").
@@ -101,9 +187,11 @@ function installedResourceChecks(text:string,options:WorkflowPortabilityOptions)
         return operands.slice(0,-1).some(operand=>canonical(operand[0])===ref.path&&ref.start>=start+operand.index!&&ref.end<=start+operand.index!+operand[0].length);
       });
       const copySource=inlineCopySource||action?.[1].toLowerCase()==='copy'&&!/\b(?:to|into|over)\b/i.test(before.slice(action.index!+action[0].length));
-      const followingAction=!/\b(?:never|do not|don't|must not|cannot)\b/i.test(after)&&(/^[`"'\s,]*(?:then\s+|and\s+)?(?:update|edit|modify|overwrite|delete|remove|restore)\s+(?:it\b|its\b|the (?:entry|catalog|resource)\b)/i.test(after)||/^[`"'\s]*(?:(?:must|should|may|will|shall|is|are)\s+)+(?:be\s+)?(?:updated|edited|modified|overwritten|written|deleted|removed|restored)\b/i.test(after));
+      const invocationInput=invocationInputs.find(input=>input.path===ref.path&&ref.start>=input.start&&ref.end<=input.end);
+      const actionAfter=invocationInput?line.slice(invocationInput.invocationEnd):after;
+      const followingAction=!/\b(?:never|do not|don't|must not|cannot)\b/i.test(actionAfter)&&(/^[`"'\s,]*(?:then\s+|and\s+)?(?:update|edit|modify|overwrite|delete|remove|restore)\s+(?:it\b|its\b|the (?:entry|catalog|resource)\b)/i.test(actionAfter)||/^[`"'\s]*(?:(?:must|should|may|will|shall|is|are)\s+)+(?:be\s+)?(?:updated|edited|modified|overwritten|written|deleted|removed|restored)\b/i.test(actionAfter));
       const shellWrite=instructionWrite(shellFence?line:line.replace(/^\s*(?:>\s*)+/,''),value=>canonical(value)===ref.path);
-      if(shellWrite||!negated&&(action&&!sourceRead&&!copySource||followingAction)){writes.add(ref.path);continue;}
+      if(shellWrite||!negated&&(action&&!sourceRead&&!copySource&&!invocationInput||followingAction)){writes.add(ref.path);continue;}
       if(!options.requiredMutableResources?.includes(ref.path))continue;
       // Packaged content remains valid only as an explicitly immutable baseline,
       // seed or provenance read; all live state must follow the editable fork.
@@ -355,7 +443,7 @@ export function adaptWorkflowText(input: string, options: WorkflowPortabilityOpt
     text = text.replace(/\bRead\(offset,\s*limit\)/g, 'a bounded file read (offset, limit)');
     text = text.replace(/`(Read|Glob|Grep|Write|Edit|Bash|WebSearch|WebFetch)`/g, (_match, name: string) => ({ Read: 'the available file reader', Glob: 'the available file search', Grep: 'the available content search', Write: 'the available file writer', Edit: 'the available precise file editor', Bash: 'the available shell', WebSearch: 'the available web search', WebFetch: 'the available page fetch' })[name]!);
     text = text.replace(/\b(?:Use|use|via) (Read|Glob|Grep|Write|Edit)\b/g, (match, name: string) => match.slice(0, match.length - name.length) + ({ Read: 'the available file reader', Glob: 'the available file search', Grep: 'the available content search', Write: 'the available file writer', Edit: 'the available precise file editor' })[name]);
-    text = text.replace(/(?<![\w/.\\-])Bash(?![\w/\\(-]|\.[a-zA-Z0-9])/g, 'the available shell')
+    text = text.replace(/(?<![\w/.\\-])(?<!Git )Bash(?![\w/\\(-]|\.[a-zA-Z0-9])/g, 'the available shell')
       .replace(/(?<![\w/.\\-])WebSearch(?![\w/\\(-]|\.[a-zA-Z0-9])/g, 'the available web search')
       .replace(/(?<![\w/.\\-])WebFetch(?![\w/\\(-]|\.[a-zA-Z0-9])/g, 'the available page fetch');
     text = nativeRoutes(text);
@@ -372,7 +460,47 @@ export function adaptWorkflowText(input: string, options: WorkflowPortabilityOpt
     return text;
   };
 
-  const lines = input.split(/(?<=\n)/);
+  // These complete, finite operational clauses have a known target procedure.
+  // Match literal source text (or its exact mapped resource spelling), outside
+  // surrounding fences/frontmatter. Unknown API fixtures/imports stay unmet.
+  let instructionInput=input;
+  const replaceActiveClause=(source:string,replacement:string,code:string,message:string):boolean=>{
+    let pattern=escape(source);
+    for(const path of ['CLAUDE.md','.claude/settings.local.json']){
+      const target=options.sourceToTarget?.[path];
+      if(target&&target!==path)pattern=pattern.replaceAll(escape(path),'(?:'+escape(path)+'|'+escape(target)+')');
+    }
+    const match=new RegExp(pattern.replace(/\n/g,'\\r?\\n'),'g');let changed=false;
+    instructionInput=instructionInput.replace(match,(whole,offset:number)=>{
+      if(!activeClauseAt(instructionInput,offset))return whole;
+      changed=true;finding(code,'warning',message);return replacement;
+    });
+    return changed;
+  };
+  const engineWrite=replaceActiveClause(engineReferenceWriteClause,
+    'Within the same Section 4 approved Technology Stack write, merge the required engine-reference loading instruction into `<project-root>/AGENTS.md` under the existing `ENGINE-REFERENCE-IMPORT` marker. Read the actual project AGENTS.md and its applicable scoped instructions first; preserve unrelated content and the original Section 4 confirmation. The instruction under that marker must require: "Before engine-dependent work, explicitly read and load `docs/engine-reference/<engine>/VERSION.md` from the selected project. If the configured reference is missing or unreadable, STOP dependent work and report the missing input." Set <engine> from the actual configured choice: Godot → `docs/engine-reference/godot/VERSION.md`; Unity → `docs/engine-reference/unity/VERSION.md`; Unreal → `docs/engine-reference/unreal/VERSION.md`. Do not write an @ import or promise automatic imports. Re-running setup for a different engine replaces only this marker-bound instruction within the authorized merge. Section 7 creates the selected reference directory and documents when absent; verify that reference exists and is loaded before dependent engine work. Section 8 only reads back this same instruction and does not authorize another edit.',
+    'workflow-engine-reference-loading-ported','The known engine-reference import becomes one approved project AGENTS.md loading instruction, with the same marker, engine selection and Section 4 approval; Section 8 remains read-only.');
+  if(engineWrite)replaceActiveClause('Read `CLAUDE.md` and show the user the proposed Technology Stack changes.','Read `<project-root>/AGENTS.md` and show the user the proposed Technology Stack changes.','workflow-engine-reference-loading-ported','The known engine setup reads the actual project instruction file before its approved merge.');
+  replaceActiveClause(engineReferenceVerifyClause,
+    '## 8. Verify the Project Engine-Reference Loading Instruction\n\n**The loading instruction was already written in Section 4 — do not edit it again and do not ask again.** This is a read-only verification of the same approved change. Read the actual `<project-root>/AGENTS.md` and find `ENGINE-REFERENCE-IMPORT` by its marker, never by a heading. Confirm that its required explicit read/load instruction names `docs/engine-reference/<engine>/VERSION.md` for the engine just configured, that the project reference exists and is readable, and that it is actually loaded before dependent engine work. Missing, unreadable or wrong-engine content is not a pass. If the instruction is absent or names a different engine, Section 4 did not complete: return to and finish Section 4 under its original approval contract rather than patching anything or opening a second approval prompt here. No source @ import or automatic target import is assumed.',
+    'workflow-engine-reference-loading-ported','The known Section 8 import check verifies the actual project instruction and engine reference without another write or approval.');
+  replaceActiveClause('This skill pre-approves `godot` on PATH. An engine run through `engine.path` or\nthe executable `commands.test` names asks first: the user approves it once, or\nadds `Bash(<that executable> *)` to `.claude/settings.local.json`.',
+    'This document does not grant actual Codex session permission. Before an engine run, resolve `godot` on PATH, `engine.path` or the executable named by `commands.test` to the real intended binary and validate the selected project, working directory and literal argv; never interpolate project configuration or user arguments into executable shell text. Preserve the original `engine.path` and `commands.test` ask-first branch: obtain an actual user approval for that executable or verify an already valid approval in the supported target authorization system. Existing authorized `godot` use remains subject to actual session/tool permissions. A source permission pattern cannot authorize Codex and no source settings file should be edited as a substitute. If required permission, the executable or its runtime is unavailable, STOP the dependent run and report `Run result: NOT VERIFIED` with the reason; preserve the original visual gates and strictness settings.',
+    'workflow-engine-permission-ported','Engine execution uses actual target permissions and literal argv; the original configured-executable ask-first branch remains required.');
+  replaceActiveClause('The agent can see images: Claude Code\'s `Read` tool renders a PNG. The whole\nproblem is getting a picture out of the engine unattended, and every supported\nengine has a native way.',
+    'Verify actual image-viewing capability in the current Codex session before claiming an observation. Capture and retain the real engine image using the applicable documented engine mechanism, then open and inspect that PNG with a supported image-viewing tool; a text-only read is insufficient. If image viewing is unavailable, the PNG is unreadable or no actual visual inspection occurred, report `Run result: NOT VERIFIED` with the reason and retain the original visual acceptance gates and explicit strictness exceptions. A generated capture or an engine exit alone does not establish what was observed.',
+    'workflow-image-observation-ported','Visual evidence requires actual retained image inspection through a supported target viewer; unavailable viewing keeps NOT VERIFIED and original visual gates.');
+  replaceActiveClause('4. **Look.** `Read` the PNG.','4. **Look.** Open and visually inspect the retained PNG with the actual supported image-viewing tool; if unavailable, record `Run result: NOT VERIFIED`.','workflow-image-observation-ported','Visual observation uses a supported image viewer rather than assuming a text reader displays PNGs.');
+  replaceActiveClause('`MSYS_NO_PATHCONV=1` prefix is required on Windows:** Claude Code runs commands\nin Git Bash, which rewrites any argument beginning with `/` as a Windows path, so\n`/Game/Maps/Shop` reaches the engine as `C:/Program Files/Git/Game/Maps/Shop`\nand the game stops on a "map not found" dialog nobody can see.',
+    '`MSYS_NO_PATHCONV=1` prefix is conditional:** identify the actual shell and runtime first. Apply the no-path-conversion workaround only when executing through actual MSYS/Git Bash with argument path conversion active, so the map URL reaches the engine unchanged. In native PowerShell or another non-MSYS runtime, invoke the intended executable with literal argv and that runtime\'s environment API; do not add MSYS-only syntax or assume the examples are portable command strings. Verify the engine received the selected map URL and project before claiming the launch succeeded.',
+    'workflow-shell-runtime-ported','The known Unreal path-conversion workaround is conditional on an actual MSYS/Git Bash runtime; other target shells need literal argv and their own environment API.');
+  replaceActiveClause('**The project path must be absolute** — with `MSYS_NO_PATHCONV` set, only\n`$(pwd -W 2>/dev/null || pwd)` gives one: a relative `Game.uproject` is not\nfound, and the launch waits on an error dialog forever (verified on 5.7).',
+    '**The project path must be absolute.** Resolve and validate the actual selected project file with the current runtime\'s path API, preserve spaces as one literal argument, and fail if it is absent or unreadable. The `$(pwd -W 2>/dev/null || pwd)` example applies only to a verified compatible MSYS/Git Bash shell; it is not a universal Windows path API. Preserve the bounded launch and capture checks; an error dialog or a process exit without a retained inspected screenshot is not an observed run.',
+    'workflow-shell-runtime-ported','The configured project is resolved to an actual absolute file using the current runtime, without assuming a Git Bash command works in all target shells.');
+  replaceActiveClause(automationModeClause,
+    automationModeClause.slice(4,-4).replaceAll('AskUserQuestion','the supported decision prompt')+'\n\n'+decision,
+    'workflow-question-presentation-ported','The known operational mode pseudocode uses supported questions with the original mode branches, capped options, always-ask categories, decision logging and actual-answer consent.');
+  const lines = instructionInput.split(/(?<=\n)/);
   const output: string[] = []; let prose = ''; let fence: { char: string; size: number } | undefined; let frontmatter = /^---\r?\n/.test(input); let frontmatterFirst = true;
   const flush = () => { if (prose) { output.push(port(prose)); prose = ''; } };
   for (const line of lines) {

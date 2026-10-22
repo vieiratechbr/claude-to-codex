@@ -41,7 +41,7 @@ Para conferir um pacote já convertido, sem novas chamadas ao modelo:
 npm run test:game-studios -- --snapshot "<resultado anterior>/snapshot.json" --bundle "<resultado anterior>/bundle.json"
 ```
 
-O relatório exige as 74 chamadas individuais e uma chamada geral, quatro políticas de chamada manual preservadas, ausência de nomes repetidos, referências locais presentes, hashes dos helpers e bindings íntegros, preloads coerentes e nenhum impedimento de instalação. Não trata um pacote bloqueado como aprovado. O hash da configuração pessoal é comparado antes e depois; nenhuma restauração é aplicada sobre alterações externas.
+O relatório exige as 74 chamadas individuais e uma chamada geral, todas as políticas de chamada manual declaradas na revisão de origem preservadas, ausência de nomes repetidos, referências locais presentes, hashes dos helpers e bindings íntegros, preloads coerentes e nenhum impedimento de instalação. Não trata um pacote bloqueado como aprovado. O hash da configuração pessoal é comparado antes e depois; nenhuma restauração é aplicada sobre alterações externas.
 
 ## O que cada verificação demonstra
 
@@ -56,6 +56,8 @@ O relatório exige as 74 chamadas individuais e uma chamada geral, quatro polít
 Os recursos instalados são somente leitura. Configurações, artefatos, instruções e checkpoints vivos pertencem ao projeto selecionado. Python 3 e um GNU Bash verificado são requisitos dos helpers shell; o runner aceita o Git incluído no runtime do Codex, sem depender de `bash` no PATH.
 
 Especialistas exigem o procedimento de `codex-compat/specialists.md`: registro suportado no runtime, instruções completas, preloads, máscara efetiva, acesso aos artefatos e, quando requerido, worktree real. Copiar um TOML não comprova descoberta. Se um requisito não puder ser atendido, a fase dependente deve parar com o progresso salvo.
+
+Os scanners auxiliares que interpretam pastas e metadados exclusivos do Claude retornam `Observations: not run (...)` ou `Compatibility: not run (...)`, com código 2 e procedimento de auditoria nativa. Esse fallback é permitido pelo workflow original e não aprova nenhum controle. A auditoria usa os caminhos realmente anunciados pelo Codex, os bindings e contagens explícitas; uma pasta legada vazia não comprova compatibilidade.
 
 Resultados efetivamente obtidos e versões publicadas ficam em [VALIDATION.md](VALIDATION.md). O estado beta permanece separado da aprovação de um teste específico.
 

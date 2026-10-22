@@ -172,6 +172,33 @@ it('rejects a project fork that retains stale live reads from the installed cata
   expect(result.semanticNeeded).toBe(true);
   expect(result.findings.some(f => f.code === 'workflow-installed-resource-write-review')).toBe(true);
 });
+it.each([
+  'After writing, run `python "${C2C_RESOURCE_ROOT}/codex-compat/run-helper.py" --project "${C2C_PROJECT_ROOT}" --script "source-context/.claude/scripts/registry.sh" -- validate` and fix every row about an entry this write added.',
+  'Before writing, run `python "${C2C_RESOURCE_ROOT}/codex-compat/run-helper.py" --project "${C2C_PROJECT_ROOT}" --script "source-context/.claude/scripts/write-guard.sh" -- overwrite\n  "design/gdd/system.md"`.',
+  '- **Save them:** run `python "${C2C_RESOURCE_ROOT}/codex-compat/run-helper.py" --project "${C2C_PROJECT_ROOT}" --script "source-context/.claude/scripts/set-stage.sh" -- "[stage]"`, then check the read-back rows.',
+  'The pick is the consent to write it: run `python "${C2C_RESOURCE_ROOT}/codex-compat/run-helper.py" --project "${C2C_PROJECT_ROOT}" --script "source-context/.claude/scripts/config-set.sh" -- modes.automation [value]`.',
+  'After updating the project, execute `python3 codex-compat/run-helper.py --project "<project-root>" --script source-context/check.sh --`.',
+  'After saving the project, invoke `py -3 "codex-compat/run-helper.py" --project "<project-root>" --script="source-context/check.sh" --`.'
+])('recognizes the immutable executable and --script inputs of a project helper invocation: %s', async text => {
+  const result = await port(text);
+  expect(result.installedWritePaths).toEqual([]);
+  expect(result.findings.some(f => f.code === 'workflow-installed-resource-write-review')).toBe(false);
+  expect(result.text).toContain(text);
+});
+it.each([
+  'Update `codex-compat/run-helper.py` after approval.',
+  'Edit `source-context/check.sh` before invoking it.',
+  'Run `python codex-compat/run-helper.py --project "<project-root>" --script source-context/check.sh --`; then update `source-context/check.sh`.',
+  'Update `source-context/check.sh`; then run `python codex-compat/run-helper.py --project "<project-root>" --script source-context/check.sh --`.',
+  'Run `python codex-compat/run-helper.py --script source-context/check.sh --` and modify it after approval.',
+  'After writing, run `python codex-compat/run-helper.py --script source-context/check.sh -- > codex-compat/run-helper.py`.',
+  'After writing, run `python codex-compat/run-helper.py --script source-context/check.sh -- >> source-context/check.sh`.',
+  'After writing, run `python codex-compat/run-helper.py --script source-context/check.sh -- update source-context/catalog.yaml`.',
+  'After writing, run `python codex-compat/run-helper.py --script source-context/check.sh -- update --script source-context/catalog.yaml`.'
+])('still blocks mutation targets that accompany an immutable helper invocation: %s', async text => {
+  const result = await port(text);
+  expect(result.findings.some(f => f.code === 'workflow-installed-resource-write-review')).toBe(true);
+});
 it('accepts a seeded project-local catalog with all live operations and rollback bound to that fork', async () => {
   const text = 'Read `source-context/catalog.yaml` only as the immutable baseline seed. Ask whether to create `<project-root>/testing/catalog.yaml`; if approved, copy the baseline there without overwriting an existing fork. Read current category and scores from `<project-root>/testing/catalog.yaml` in every subsequent phase. Show the exact changes and update only approved entries in `<project-root>/testing/catalog.yaml`. Back up the fork before editing; if rejected, restore its exact pre-edit content after the original rollback consent.';
   const result = await port(text, { requiredMutableResources: ['source-context/catalog.yaml'] });
@@ -349,6 +376,134 @@ it('keeps a source import scaffold unmet until a target loading route is actuall
   expect(result.text).toContain('@docs/engine-reference/<engine>/VERSION.md');
   expect(result.semanticNeeded).toBe(true);
   expect(result.findings.some(f => f.code === 'workflow-source-instruction-import')).toBe(true);
+});
+
+const engineReferenceWrite = [
+  'In the same CLAUDE.md write, set the **Engine Version Reference** import to the',
+  'chosen engine. Find the line marked `ENGINE-REFERENCE-IMPORT` (an',
+  '`@docs/engine-reference/<engine>/VERSION.md` line under its comment) and Edit it',
+  'to point at the configured engine:',
+  '- Godot → `@docs/engine-reference/godot/VERSION.md`',
+  '- Unity → `@docs/engine-reference/unity/VERSION.md`',
+  '- Unreal → `@docs/engine-reference/unreal/VERSION.md`', '',
+  'This keeps a Unity or Unreal project from loading the Godot reference in every',
+  'session. It is idempotent — re-running `/setup-engine` for a different',
+  'engine rewrites the same line. (The target `docs/engine-reference/<engine>/`',
+  'directory is created in Section 7, Populate Engine Reference Docs, if it does not yet exist.)'
+].join('\n');
+const engineReferenceVerify = [
+  '## 8. Verify the CLAUDE.md Import', '',
+  '**This import was already written in Section 4 — do not edit it again and do not',
+  'ask again.** Section 4 sets it as part of the same CLAUDE.md write, anchored to',
+  'the `ENGINE-REFERENCE-IMPORT` marker. This step only confirms the result.', '',
+  'Read `CLAUDE.md` and confirm the line under the marker reads:', '',
+  '```markdown', '@docs/engine-reference/<engine>/VERSION.md', '```', '',
+  'with `<engine>` the engine just configured. If it still points at a different',
+  'engine, Section 4 did not complete — go back and finish it rather than patching',
+  'the line here.', '',
+  '> **Why this is a check and not a second write.** Repeating the edit here with',
+  '> its own approval prompt would ask the user twice for one change, and the second',
+  '> ask would be for work already done. Locate the line by its marker, never by the',
+  '> `## Engine Version Reference` heading — the marker exists precisely so the line',
+  '> can still be found when the heading moves or is reworded.'
+].join('\n');
+it.each(['CLAUDE.md', 'source-context/CLAUDE.md'])('ports the finite engine-reference write and verification pair from %s to one approved project instruction merge', async source => {
+  const input=('Read `CLAUDE.md` and show the user the proposed Technology Stack changes.\nAsk: "May I write these engine settings to `CLAUDE.md`?"\nWait for confirmation before making any edits.\n\n'+engineReferenceWrite).replaceAll('CLAUDE.md',source);
+  const extra={skillCalls:{'setup-engine':'setup-engine'},sourceToTarget:{'CLAUDE.md':source}};
+  const write=await port(input,extra);
+  expect(write.semanticNeeded).toBe(false);
+  expect(write.text).toContain('Read `<project-root>/AGENTS.md` and show the user');
+  expect(write.text).toContain('Wait for confirmation before making any edits.');
+  expect(write.text).toContain('ENGINE-REFERENCE-IMPORT');
+  expect(write.text).toContain('same Section 4');
+  expect(write.text).toMatch(/explicitly read and load[^\n]*docs\/engine-reference\/<engine>\/VERSION\.md/);
+  for(const engine of ['godot','unity','unreal'])expect(write.text).toContain('docs/engine-reference/'+engine+'/VERSION.md');
+  expect(write.text).not.toMatch(/@docs\/engine-reference/);
+  expect(write.text).toMatch(/(?:missing|unreadable)[^\n]*STOP|STOP[^\n]*(?:missing|unreadable)/i);
+  const verify=await port(engineReferenceVerify.replaceAll('CLAUDE.md',source),extra);
+  expect(verify.semanticNeeded).toBe(false);
+  expect(verify.text).toContain('ENGINE-REFERENCE-IMPORT');
+  expect(verify.text).toMatch(/read.only/i);
+  expect(verify.text).toContain('do not edit it again and do not ask again');
+  expect(verify.text).toContain('<project-root>/AGENTS.md');
+  expect(verify.text).toMatch(/Section 4[^\n]*(?:finish|complete)|(?:finish|complete)[^\n]*Section 4/);
+  expect(verify.text).not.toContain('@docs/');
+  expect((await port(write.text)).text).toBe(write.text);
+  expect((await port(verify.text)).text).toBe(verify.text);
+});
+it('retains unknown engine import variants and fenced copies as unmet source requirements',async()=>{
+  const unknown=await port(engineReferenceVerify.replace('ENGINE-REFERENCE-IMPORT','OTHER-IMPORT'));
+  expect(unknown.semanticNeeded).toBe(true);
+  expect(unknown.text).toContain('@docs/engine-reference/<engine>/VERSION.md');
+  const inert='````text\n'+engineReferenceVerify+'\n````';
+  expect((await port(inert)).text).toBe(inert);
+});
+it('uses actual engine permission while preserving the source ask-first branch',async()=>{
+  const input='This skill pre-approves `godot` on PATH. An engine run through `engine.path` or\nthe executable `commands.test` names asks first: the user approves it once, or\nadds `Bash(<that executable> *)` to `.claude/settings.local.json`.';
+  const result=await port(input);
+  expect(result.semanticNeeded).toBe(false);
+  expect(result.text).not.toMatch(/pre-approves|Bash\(|settings\.local\.json/);
+  expect(result.text).toMatch(/actual[^\n]*(?:Codex|session)[^\n]*permission/i);
+  expect(result.text).toMatch(/literal[^\n]*argv/i);
+  expect(result.text).toMatch(/engine\.path[^\n]*commands\.test[^\n]*ask.first/i);
+  expect(result.text).toMatch(/actual[^\n]*(?:reply|approval)/i);
+  expect((await port(result.text)).text).toBe(result.text);
+});
+it('requires actual image inspection and retains NOT VERIFIED if image viewing is unavailable',async()=>{
+  const input='The agent can see images: Claude Code\'s `Read` tool renders a PNG. The whole\nproblem is getting a picture out of the engine unattended, and every supported\nengine has a native way.\n\n4. **Look.** `Read` the PNG. Compare what is on screen to the acceptance\ncriteria. Clipped text remains a defect.';
+  const result=await port(input);
+  expect(result.semanticNeeded).toBe(false);
+  expect(result.text).not.toMatch(/Claude Code|file reader/);
+  expect(result.text).toMatch(/actual[^\n]*image.viewing/i);
+  expect(result.text).toContain('Run result: NOT VERIFIED');
+  expect(result.text).toContain('Compare what is on screen to the acceptance\ncriteria. Clipped text remains a defect.');
+  expect(result.text).toMatch(/text.only[^\n]*(?:insufficient|not)/i);
+  expect((await port(result.text)).text).toBe(result.text);
+});
+it('conditions the known Unreal MSYS workaround on the real shell and resolves absolute paths in that runtime',async()=>{
+  const input='`MSYS_NO_PATHCONV=1` prefix is required on Windows:** Claude Code runs commands\nin Git Bash, which rewrites any argument beginning with `/` as a Windows path, so\n`/Game/Maps/Shop` reaches the engine as `C:/Program Files/Git/Game/Maps/Shop`\nand the game stops on a "map not found" dialog nobody can see. Alternatively\npass the map through `-ExecCmds="open /Game/Maps/Shop"`, which is not converted.\n**The project path must be absolute** — with `MSYS_NO_PATHCONV` set, only\n`$(pwd -W 2>/dev/null || pwd)` gives one: a relative `Game.uproject` is not\nfound, and the launch waits on an error dialog forever (verified on 5.7).';
+  const result=await port(input);
+  expect(result.semanticNeeded).toBe(false);
+  expect(result.text).not.toContain('Claude Code');
+  expect(result.text).toMatch(/only[^\n]*actual MSYS\/Git Bash/i);
+  expect(result.text).toMatch(/PowerShell[^\n]*(?:literal|argv)/i);
+  expect(result.text).toMatch(/absolute[^\n]*project[^\n]*(?:path|file)|absolute[^\n]*(?:path|file)[^\n]*project/i);
+  expect(result.text).not.toMatch(/only\s*`\$\(pwd/);
+  expect(result.text).toContain('-ExecCmds="open /Game/Maps/Shop"');
+  expect((await port(result.text)).text).toBe(result.text);
+});
+const automationPattern=[
+  '```','At each decision point in this skill:','',
+  '1. Classify the decision: major or minor (see §Major vs Minor above).',
+  '2. Check whether the decision falls into an `automation_always_ask`',
+  '   category: scope_changes, file_deletions, schema_changes,',
+  '   architecture_decisions, version_bumps, external_calls.',
+  '3. Apply the mode rule:','',
+  '   collaborative:           AskUserQuestion always.',
+  '   guided + major:          AskUserQuestion with capped options + recommendation.',
+  '   guided + minor:          State recommendation inline, proceed.',
+  '   autonomous + always_ask: AskUserQuestion (regardless of mode).',
+  '   autonomous + other:      Pick recommended, log via log_decision, proceed.',
+  '4. If the question comes back skipped, dismissed or empty, it is not an',
+  '   answer: see §Every mode: a question with no answer.','```'
+].join('\n');
+it('ports only the known mode pseudocode and retains modes, choices, logging and no-answer consent',async()=>{
+  const result=await port(automationPattern);
+  expect(result.semanticNeeded).toBe(false);
+  expect(result.text).not.toContain('AskUserQuestion');
+  expect(result.text).toContain('guided + minor:          State recommendation inline, proceed.');
+  expect(result.text).toContain('autonomous + other:      Pick recommended, log via log_decision, proceed.');
+  expect(result.text).toContain('capped options + recommendation');
+  expect(result.text).toContain('scope_changes, file_deletions, schema_changes');
+  expect(result.text).toContain('architecture_decisions, version_bumps, external_calls');
+  expect(result.text).toContain('skipped, dismissed or empty');
+  expect(result.text).toMatch(/actual user reply|actual.*answer/i);
+  expect((await port(result.text)).text).toBe(result.text);
+  const unknown=await port(automationPattern.replace('collaborative:','unrecognized-mode:'));
+  expect(unknown.semanticNeeded).toBe(true);
+  expect(unknown.text).toContain('AskUserQuestion');
+  const historical='````text\n'+automationPattern+'\n````';
+  expect((await port(historical)).text).toBe(historical);
 });
 
 it('recognizes mapped instruction resources even when their preserved filenames retain source spelling', async () => {
