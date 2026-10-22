@@ -1,5 +1,5 @@
 import { test, expect, _electron } from '@playwright/test';
-import { mkdtemp, mkdir } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 test.skip(process.env.C2C_PACKAGED_TEST !== '1', 'Explicit packaged verification only');
 test('abre o executável empacotado com ponte isolada e perfil temporário', async () => {
@@ -13,7 +13,8 @@ test('abre o executável empacotado com ponte isolada e perfil temporário', asy
     const page = await application.firstWindow();
     await expect(page.getByLabel('Link do GitHub')).toBeVisible();
     expect(await application.evaluate(({ app }) => app.isPackaged)).toBe(true);
-    expect(await application.evaluate(({ app }) => app.getVersion())).toBe('0.3.0-beta.2');
+    const expectedVersion = JSON.parse(await readFile(join(process.cwd(), 'package.json'), 'utf8')).version;
+    expect(await application.evaluate(({ app }) => app.getVersion())).toBe(expectedVersion);
     expect(await application.evaluate(({ app }) => app.getPath('userData'))).toContain(root);
     expect(await page.evaluate(() => typeof (window as any).require)).toBe('undefined');
     expect(await page.evaluate(() => typeof (window as any).claudeToCodex.analyze)).toBe('function');

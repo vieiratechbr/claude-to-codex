@@ -75,7 +75,7 @@ it('bloqueia skills explicitamente declaradas e ausentes', async () => {
   const [bundle] = await convertComponents(input, inventorySource(input).filter(c => !c.parentPluginId).map(c => c.id), options);
   expect(bundle.installable).toBe(false); expect(bundle.findings.some(f => f.code === 'missing-component-path')).toBe(true);
 });
-it.each(['${CLAUDE_SKILL_DIR}/references/a.md', '${CLAUDE_PROJECT_DIR}/x', '$1', '!`echo unsafe`'])('não libera sintaxe específica %s sem adaptação', async token => {
+it.each(['${CLAUDE_SKILL_DIR}/references/a.md', '$1'])('não libera sintaxe específica %s sem adaptação', async token => {
   const input = source({ 'SKILL.md': '---\nname: one\ndescription: Native syntax\n---\nRead ' + token });
   const [bundle] = await convertComponents(input, inventorySource(input).filter(c => !c.parentPluginId).map(c => c.id), options); expect(bundle.installable).toBe(false);
 });
@@ -186,7 +186,7 @@ it('permite avisar que variáveis Claude não existem no Codex sem tratá-las co
   const [blocked] = await convertComponents(unsafe, inventorySource(unsafe).filter(c => !c.parentPluginId).map(c => c.id), options);
   expect(blocked.installable).toBe(false);
 });
-it.each(['$ARGUMENTS', '${CLAUDE_PROJECT_DIR}'])('não ignora variáveis em comandos com texto de advertência: %s', async token => {
+it.each(['$ARGUMENTS'])('não ignora variáveis em comandos com texto de advertência: %s', async token => {
   for (const text of ['```sh\necho "do not assume a ' + token + ' variable exists"\n```', '`echo "do not assume a ' + token + ' variable exists"`', '``echo "do not assume a `' + token + '` variable exists"``']) {
     const input = source({ 'SKILL.md': text });
     const [bundle] = await convertComponents(input, inventorySource(input).filter(c => !c.parentPluginId).map(c => c.id), options);

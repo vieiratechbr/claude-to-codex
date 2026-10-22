@@ -1,6 +1,14 @@
 import { spawn } from 'node:child_process';
 export interface ProcessOptions { cwd?: string; env?: NodeJS.ProcessEnv; stdin?: string|Buffer; signal?: AbortSignal; timeoutMs: number; maxBytes: number }
 export interface ProcessResult { stdout: Buffer; stderr: string; exitCode: number }
+export class ProcessFailure extends Error {
+  #output: Buffer;
+  constructor(result: ProcessResult) {
+    super(redact(result.stderr.trim() || 'O processo terminou com erro (' + result.exitCode + ').'));
+    this.#output = result.stdout;
+  }
+  get stdout(): Buffer { return this.#output; }
+}
 export function redact(text: string): string {
   return text.replace(/https:\/\/[^/\s@]+@/g, 'https://[oculto]@')
     .replace(/\b(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|sk-[A-Za-z0-9_-]+)\b/g, '[credencial oculta]');
@@ -38,6 +46,6 @@ export async function runProcess(executable: string, args: readonly string[], op
 }
 export async function checkedProcess(executable: string, args: readonly string[], options: Partial<ProcessOptions> = {}): Promise<ProcessResult> {
   const result = await runProcess(executable, args, { timeoutMs: 30000, maxBytes: 8 * 1024 * 1024, ...options });
-  if (result.exitCode !== 0) throw new Error(redact(result.stderr.trim() || 'O processo terminou com erro (' + result.exitCode + ').'));
+  if (result.exitCode !== 0) throw new ProcessFailure(result);
   return result;
 }

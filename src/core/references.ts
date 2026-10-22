@@ -72,7 +72,10 @@ export function preserveReferences(snapshot: SourceSnapshot, files: Map<string,B
           destination = origin; put(destination, source.data, origin);
         }
         enqueue(destination);
-        return (posix.relative(targetBase, destination) || posix.basename(destination)) + fragment;
+        const relative=posix.relative(targetBase, destination)||posix.basename(destination);
+        // Markdown destinations remain URLs after relocation. Decoding a %20
+        // into a bare space would make the next pass resolve a truncated path.
+        return (inline?relative:relative.split('/').map(encodeURIComponent).join('/'))+fragment;
       } catch (error) { if(!findings.some(f=>f.code==='missing-reference'&&f.file===file.path&&f.message.endsWith(': '+raw)))findings.push({ code: 'missing-reference', severity: 'blocking', message: (error as Error).message, file: file.path }); return raw; }
     };
     let text = file.data.toString();

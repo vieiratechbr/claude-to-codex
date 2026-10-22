@@ -42,7 +42,7 @@ No PowerShell, use `npm.cmd` se a política bloquear `npm.ps1`.
 npm run dist:win
 ```
 
-Saída: `release/Claude-to-Codex-0.3.0-beta.2-Windows-x64-Setup.exe`. A publicação promove o artifact de uma verificação Windows aprovada, sem recompilar durante a publicação. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
+Saída: `release/Claude-to-Codex-0.3.0-beta.3-Windows-x64-Setup.exe`. A publicação promove o artifact de uma verificação Windows aprovada, sem recompilar durante a publicação. Consulte as evidências em [VALIDATION.md](docs/VALIDATION.md). macOS e Linux ainda não foram validados.
 
 ## Usar
 
@@ -71,7 +71,7 @@ O aplicativo consulta as releases públicas ao abrir e em **Ambiente → Consult
 
 Dados ficam em `%APPDATA%/Claude to Codex`. O destino Codex usa `CODEX_HOME` ou `~/.codex`. Para um perfil alternativo do aplicativo, defina `CLAUDE_TO_CODEX_HOME` com caminho absoluto antes de abri-lo.
 
-A conversão assistida usa `codex exec`, schema, sandbox de leitura e ferramentas desativadas. Não materializa código da origem no workspace do modelo. Além da skill ativa, envia até 16 trechos de recursos textuais relevantes, limitados a 24 KiB por trecho e 128 KiB no total, e um inventário limitado de caminhos. Esse contexto é somente leitura: o modelo pode editar apenas a skill ativa. Depende de rede, disponibilidade e limites da conta Codex.
+A conversão assistida usa `codex exec`, schema, sandbox de leitura e ferramentas desativadas, em um perfil temporário separado da configuração, instruções, skills e plugins pessoais. Reutiliza o login oficial disponível; uma cópia temporária do cache padrão de autenticação é removida ao encerrar. Não materializa código da origem no workspace do modelo. Cada chamada adapta um documento operacional e recebe até 16 trechos relevantes, limitados a 12 KiB por trecho e 48 KiB no total, com início/final e omissões identificadas. O contexto é somente leitura: o modelo pode editar apenas o documento selecionado. Depende de rede, disponibilidade e limites da conta Codex; login somente no keyring não é exportado.
 
 A consulta de atualizações usa a API pública de releases deste projeto, sem autenticação GitHub e sem enviar os dados das skills. Aceita links HTTPS de download e notas do próprio repositório.
 
@@ -92,6 +92,8 @@ npm run test:packaged
 ```
 
 Testes de instalação usam `CODEX_HOME` temporário. Testes comuns não exigem login nem rede. Veja [contribuição](docs/CONTRIBUTING.md), [arquitetura](docs/superpowers/specs/2026-10-13-claude-to-codex-design.md) e [plano](docs/superpowers/plans/2026-10-13-claude-to-codex.md). O mantenedor trabalha diretamente na **main**.
+
+O teste opcional da coleção Game Studios fixa a revisão da origem e verifica todas as 74 skills, catálogo, políticas, dependências e hashes. Consulte [como reproduzir a validação](docs/GAME-STUDIOS-QA.md); chamadas ao modelo exigem `--assist` e usam a disponibilidade da conta Codex.
 
 O teste opcional `npm run test:ui-ux-pro-max` usa a revisão fixada do repositório `nextlevelbuilder/ui-ux-pro-max-skill`, seleciona a principal pela interface, usa rede e sua conta Codex para adaptação. Instala somente em um perfil temporário, verifica a instalação e depois executa os scripts revisados de busca no cache nativo com consultas de teste. Requer Python 3 no PATH, ou `C2C_QA_PYTHON` com o caminho do executável. O relatório fica em `.cache/uipro-assisted-*/report.json`. Use `C2C_QA_SCOPE=repository` para testar o pacote inteiro e `C2C_QA_SHOW_WINDOW=1` para acompanhar a janela e salvar screenshots. A skill importada também requer Python no computador de quem a utilizar.
 

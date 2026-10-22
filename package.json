@@ -1,6 +1,6 @@
 {
   "name": "claude-to-codex",
-  "version": "0.3.0-beta.2",
+  "version": "0.3.0-beta.3",
   "description": "Converta extensões do Claude Code e instale no Codex local.",
   "private": true,
   "author": "vieiratechbr",
@@ -20,6 +20,7 @@
     "test:packaged": "node scripts/check-packaged.mjs",
     "test:codex-local": "node scripts/check-local-codex.mjs",
     "test:ui-ux-pro-max": "node scripts/check-ui-ux-pro-max.mjs",
+    "test:game-studios": "node scripts/check-game-studios.mjs",
     "dist:win": "npm run build && electron-builder --win nsis --x64 --publish never"
   },
   "dependencies": {

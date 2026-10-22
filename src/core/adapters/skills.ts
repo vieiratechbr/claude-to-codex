@@ -4,7 +4,7 @@ import { slug } from '../paths';
 import type { Finding } from '../../shared/contracts';
 export function claudeSyntaxMarkers(text: string): string[] {
   text=text.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/,'');
-  const code: string[] = []; const prose: string[] = []; let fence: { char: string; length: number }|undefined;
+  const code: string[] = []; const prose: string[] = []; const invocationCode:string[]=[];let fence: { char: string; length: number }|undefined;
   for (const line of text.split(/\r?\n/)) {
     const marker = /^[ \t]*(`{3,}|~{3,})(.*)$/.exec(line);
     if (!fence && marker) { fence = { char: marker[1][0], length: marker[1].length }; continue; }
@@ -17,8 +17,11 @@ export function claudeSyntaxMarkers(text: string): string[] {
     if (/^(?:\$ARGUMENTS|\$\{CLAUDE_[A-Z_]+\})$/i.test(content)) return all;
     code.push(content); return '[code]';
   }).replace(/\b(?:do not|don't|never) assume(?: a| the)?\s+(`+)(?:\$ARGUMENTS|\$\{CLAUDE_[A-Z_]+\})\1(?: variable)?\s+(?:exists|is available)(?: in Codex)?/gi, '');
-  const behavior = narrative + '\n' + code.join('\n');
-  return [...new Set([...(behavior.match(/\b(?:Claude Code|ClaudeCode|Bash|TodoWrite|AskUserQuestion|MultiEdit)\b|\b(?:tool|ferramenta|use|usar)\s+(?:Read|Write|Edit|Task)\b|\$ARGUMENTS|\$\{CLAUDE_[A-Z_]+\}|(?<!\\)\$\d+|\/\w[\w-]*:[\w-]+/gi)||[]),...(/!`[^`]+`/.test(text)?['dynamic-command']:[])])];
+  // Product attribution is not a requirement for the source harness. Keep every
+  // other platform/API occurrence detectable, including on the same line.
+  const behavior = (narrative + '\n' + code.join('\n')).replace(/\bClaude Code Game Studios\b/g, 'CCGS source project');
+  for(const match of prose.join('\n').matchAll(/(`+)([\s\S]*?)\1/g))invocationCode.push(match[2]);
+  return [...new Set([...(behavior.match(/\b(?:Claude Code|ClaudeCode|TodoWrite|AskUserQuestion|MultiEdit|TaskCreate|TaskGet|TaskList|TaskUpdate)\b|\b(?:tool|ferramenta|use|usar)\s+(?:Read|Write|Edit|Task)\b|\$ARGUMENTS|\$\{CLAUDE_[A-Z_]+\}|\/\w[\w-]*:[\w-]+/gi)||[]),...((narrative+'\n'+invocationCode.join('\n')).match(/(?<!\\)\$\d+(?![a-zA-Z0-9_])/g)||[]),...(/\bBash\s*\(/.test(behavior)?['Bash']:[]),...(/!`[^`]+`/.test(text)?['dynamic-command']:[])])];
 }
 export function adaptSkill(text: string, name: string, kind: 'skill'|'command'|'agent' = 'skill'): { text: string; findings: Finding[]; semantic: boolean; manualOnly:boolean } {
   const findings: Finding[] = []; let meta: ReturnType<typeof markdownMetadata> = {};

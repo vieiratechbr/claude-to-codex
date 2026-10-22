@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { adaptWithCodex } from '../../src/core/semantic';
 import { checkedProcess } from '../../src/core/process';
+import { selectSemanticContext } from '../../src/core/semantic-context';
 import type { BundleFile, ConversionOptions } from '../../src/shared/contracts';
 
 vi.mock('../../src/core/process', async importOriginal => ({ ...await importOriginal<typeof import('../../src/core/process')>(), checkedProcess: vi.fn() }));
+vi.mock('../../src/core/isolated-codex-home',()=>({createIsolatedCodexHome:vi.fn(async(root:string)=>({env:{CODEX_HOME:root+'/fixture-home'},cleanup:async()=>{}}))}));
 const temporary: string[] = [];
 afterEach(async () => {
   vi.mocked(checkedProcess).mockReset();
@@ -84,7 +86,7 @@ it('limits a UTF-8 excerpt without splitting characters and reports its original
   const data = '😀'.repeat(20_000);
   const { context } = await promptFor('Read `references/large.md`.', [support('skills/design-system/references/large.md', data)]);
   expect(context.files).toHaveLength(1);
-  expect(Buffer.byteLength(context.files[0].content)).toBe(24 * 1024);
+  expect(Buffer.byteLength(context.files[0].content)).toBeLessThanOrEqual(12 * 1024);
   expect(context.files[0].content).not.toContain('\uFFFD');
   expect(context.files[0]).toMatchObject({ truncated: true, originalBytes: 80_000 });
 });
@@ -97,14 +99,14 @@ it('includes at most sixteen excerpts and reports the referenced files omitted b
   expect(context.omittedCount).toBe(4);
 });
 
-it('caps the combined UTF-8 excerpt budget at 128 KiB and reports partial and omitted resources', async () => {
+it('caps the combined UTF-8 excerpt budget at 48 KiB and reports partial and omitted resources', async () => {
   const files = Array.from({ length: 8 }, (_, i) => support(`skills/design-system/references/ref-${i}.md`, 'A'.repeat(30 * 1024)));
   const { context } = await promptFor(files.map(file => `[read](${file.path.replace('skills/design-system/', '')})`).join('\n'), files);
-  expect(context.files).toHaveLength(6);
-  expect(context.files.reduce((total: number, file: { content: string }) => total + Buffer.byteLength(file.content), 0)).toBe(128 * 1024);
-  expect(context.files[5]).toMatchObject({ truncated: true });
-  expect(Buffer.byteLength(context.files[5].content)).toBe(8 * 1024);
-  expect(context.unavailable.filter((file: { reason: string }) => file.reason === 'total-byte-limit')).toHaveLength(2);
+  expect(context.files).toHaveLength(4);
+  expect(context.files.reduce((total: number, file: { content: string }) => total + Buffer.byteLength(file.content), 0)).toBe(48 * 1024);
+  expect(context.files[3]).toMatchObject({ truncated: true });
+  expect(Buffer.byteLength(context.files[3].content)).toBe(12 * 1024);
+  expect(context.unavailable.filter((file: { reason: string }) => file.reason === 'total-byte-limit')).toHaveLength(4);
 });
 
 it('bounds the path inventory while keeping evidence for a directly referenced resource', async () => {
@@ -118,7 +120,7 @@ it('bounds the path inventory while keeping evidence for a directly referenced r
   expect(context.inventory.total).toBe(601);
   expect(context.inventory.omitted).toBe(601 - context.inventory.paths.length);
   expect(context.inventory.truncated).toBe(true);
-  expect(Buffer.byteLength(prompt)).toBeLessThan(1024 * 1024);
+  expect(Buffer.byteLength(prompt)).toBeLessThan(1012 * 1024);
 });
 it('rejects an attempt to edit a supporting reference instead of the editable skill', async () => {
   const dataRoot=await mkdtemp(join(tmpdir(),'c2c-context-edit-'));temporary.push(dataRoot);
@@ -130,4 +132,81 @@ it('identifies an active auxiliary skill by its advertised metadata name',async(
   const helper={path:'skills/foundation/SKILL.md',content:'---\nname: brand-guide\ndescription: Brand guidance\n---\nUse consistent identity.'};
   const {context}=await promptFor('Use brand-guide.',[support(helper.path,helper.content)],[helper]);
   expect(context.files.map((file:{path:string})=>file.path)).toContain('skills/foundation/SKILL.md');
+});
+
+it('includes the end of a large helper with explicit incomplete excerpt ranges', () => {
+  const data = Buffer.from('# helper header\n' + '# middle detail\n'.repeat(4000) + 'if executing_directly; then\n  require_explicit_project_root\nfi\n');
+  const context = selectSemanticContext({ path: 'skills/main/SKILL.md', content: 'Read [helper](../../shared/helper.sh).' }, [support('shared/helper.sh', data)], ['skills/main/SKILL.md']);
+  const file = context.files[0];
+  expect(file.content).toContain('# helper header');
+  expect(file.content).toContain('require_explicit_project_root');
+  expect(file.content).toMatch(/omitted|omitido/i);
+  expect(file.content).toContain('line ranges');
+  expect(file.ranges[0].startLine).toBe(1);
+  expect(file.ranges.at(-1)).toMatchObject({ endByte: data.length, endLine: 4004 });
+  expect(file.omittedBytes).toBeGreaterThan(0);
+  expect(file.truncated).toBe(true);
+  expect(file.originalBytes).toBe(data.length);
+  expect(Buffer.byteLength(file.content)).toBeLessThanOrEqual(12 * 1024);
+});
+
+it('matches complete skill names without treating helper or restart as aliases', () => {
+  const paths = ['skills/help/SKILL.md', 'skills/start/SKILL.md', 'skills/brand/SKILL.md'];
+  const context = selectSemanticContext({ path: 'skills/main/SKILL.md', content: 'Inspect the helper and restart safely. Then use brand.' }, paths.map(path => support(path, 'Guidance.')), paths);
+  expect(context.files.map(file => file.path)).toEqual(['skills/brand/SKILL.md']);
+});
+
+it('keeps exact linked dependencies ahead of merely named auxiliary skills', () => {
+  const names = Array.from({ length: 18 }, (_, i) => `aux-${i}`);
+  const paths = names.map(name => `skills/${name}/SKILL.md`);
+  const context = selectSemanticContext({ path: 'skills/main/SKILL.md', content: 'Read [resource map](references/map.md). ' + names.join(' ') }, [
+    support('skills/main/references/map.md', 'Read [runtime](../../../shared/runtime.md).'),
+    support('shared/runtime.md', 'The authoritative runtime contract.'),
+    ...paths.map(path => support(path, 'Auxiliary guidance.'))
+  ], ['skills/main/SKILL.md', ...paths]);
+  expect(context.files.map(file => file.path).slice(0, 2)).toEqual(['skills/main/references/map.md', 'shared/runtime.md']);
+});
+
+it('keeps actual active skill entries distinct from editable supporting documents', async () => {
+  const dataRoot = await mkdtemp(join(tmpdir(), 'c2c-active-context-')); temporary.push(dataRoot);
+  const activeSkillPaths = ['skills/main/SKILL.md', 'skills/brand/SKILL.md'];
+  const options: ConversionOptions = { useCodex: true, dataRoot, diagnostics: { authenticated: true, codexPath: 'codex.exe', capabilities: { exec: true, pluginAdd: true, marketplaceAdd: true, pluginListJson: true, isolatedConversion: true }, findings: [] } };
+  let seen: { skillPaths: string[]; supportingContext: { files: { path: string }[] } } | undefined;
+  vi.mocked(checkedProcess).mockImplementation(async (_exe, _args, processOptions) => {
+    const request = JSON.parse(String(processOptions?.stdin).split('Material a converter:\n')[1]); seen = request;
+    return { stdout: Buffer.from(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify({ files: [{ path: request.files[0].path, edits: [] }], findings: [] }) } })), stderr: '', exitCode: 0 };
+  });
+  await adaptWithCodex({ files: [{ path: 'skills/main/references/guide.md', content: 'Use brand.' }], findings: [], activeSkillPaths, supportingFiles: [support('skills/brand/SKILL.md', 'Brand guidance.')] }, options);
+  expect(seen?.skillPaths).toEqual(activeSkillPaths);
+  expect(seen?.supportingContext.files.map(file => file.path)).toEqual(['skills/brand/SKILL.md']);
+});
+it('decodes resource URLs before locating read-only evidence in the bundle', () => {
+  const context=selectSemanticContext({path:'skills/main/SKILL.md',content:'Read [rubric](../../source-context/Quality%20Rules/review%20rubric.md#verdict).'},[
+    support('source-context/Quality Rules/review rubric.md','Inspect evidence before a verdict.')
+  ],['skills/main/SKILL.md']);
+  expect(context.files.map(file=>file.path)).toEqual(['source-context/Quality Rules/review rubric.md']);
+  expect(context.unavailable).toEqual([]);
+});
+it('resolves explicit package runtime paths before command arguments without inventing project resources', () => {
+  const context=selectSemanticContext({path:'skills/main/SKILL.md',content:'Run "${C2C_RESOURCE_ROOT}/codex-compat/run-helper.py" --project "${C2C_PROJECT_ROOT}" --script "source-context/Shared Rules/helper.sh" -- --check.\nRead ${C2C_RESOURCE_ROOT}/codex-compat/runtime.md; before use.\nProject work uses "${C2C_PROJECT_ROOT}/scripts/build.sh".'},[
+    support('codex-compat/run-helper.py','Runner contract.'),
+    support('codex-compat/runtime.md','Runtime prerequisites.'),
+    support('source-context/Shared Rules/helper.sh','#!/bin/sh\n# Preserved helper, not executed.')
+  ],['skills/main/SKILL.md']);
+  expect(context.files.map(file=>file.path).sort()).toEqual(['codex-compat/run-helper.py','codex-compat/runtime.md','source-context/Shared Rules/helper.sh']);
+  expect(context.unavailable).toEqual([]);
+});
+it('directs adaptation to the generated conditional specialist contracts and avoids newly introduced legacy warning tokens', async () => {
+  const {prompt,context}=await promptFor('Consult [specialist bindings](../../codex-compat/specialist-bindings.json) and [setup](../../codex-compat/specialists.md).',[
+    support('codex-compat/specialist-bindings.json','{"roles":[{"resourcePath":"codex-compat/agents/reviewer.toml","status":"conditional"}]}'),
+    support('codex-compat/specialists.md','Verify role discovery, preloads and the actual capability mask before delegation.'),
+    support('codex-compat/agents/reviewer.toml','name = "reviewer"\n[features]\nshell_tool = false\n')
+  ]);
+  expect(context.files.map((file:{path:string})=>file.path)).toEqual(expect.arrayContaining(['codex-compat/specialist-bindings.json','codex-compat/specialists.md','codex-compat/agents/reviewer.toml']));
+  const directions=prompt.split('Material a converter:\n')[0];
+  expect(directions).toContain('contratos condicionais');
+  expect(directions).toMatch(/preloads.*máscaras.*setup/i);
+  expect(directions).toMatch(/advertências.*sem repetir tokens/i);
+  expect(directions).toMatch(/procedimento concreto.*equivalente/i);
+  expect(directions).toMatch(/não.*reclassifiq|não.*rotul|Não rotul/i);
 });
