@@ -321,3 +321,15 @@ A instalação real no Codex, em `CODEX_HOME` descartável, passou no registro, 
 Os 43 helpers finais são byte a byte idênticos aos da conferência de sintaxe/registro já aprovada; o resultado foi reaproveitado sem repetir os testes. Os testes funcionais de helpers e Godot estão registrados acima. A revisão independente dos últimos documentos preservou alternativas, consentimento, modos, gates, checkpoints, recuperação e avaliação de agentes.
 
 O pacote conserva avisos de adaptação e de requisitos no uso; zero impedimentos não significa zero avisos. Especialistas dependem de configuração e descoberta efetivas, e funções sem controle real devem parar. As 123 especificações foram preservadas e conferidas como dados, **não executadas como 123 testes de jogo**. Não foram executadas 74 tarefas reais nem projetos Unity/Unreal. Não se afirma compatibilidade universal ou aprovação de toda integração externa.
+
+
+### Publicação da beta.3
+
+[Publicação 39868172317](https://github.com/vieiratechbr/claude-to-codex/actions/runs/39868172317): **success**. [Release v0.3.0-beta.3](https://github.com/vieiratechbr/claude-to-codex/releases/tag/v0.3.0-beta.3), ID `421279713`, `draft: false`, `prerelease: true`. Tag no commit `8bc359c656a80becb35112e482a04487d6af00f0`, com aplicação idêntica ao build aprovado. Artefato promovido sem recompilação. A release beta.2 e seu instalador anterior foram reconferidos e preservados.
+
+Instalador publicado: asset `667320056`, **113.337.082 bytes**, SHA-256 `670b303cd025de3f37a3acd01d223d54e9cba69292dc8b4174cbd75e05517e19`. O `SHA256SUMS.txt` foi baixado sem autenticação; seu conteúdo confere com esse digest, e seu próprio SHA-256 confere com o asset de checksum `667320054` (`bf75d323abdea57e9cb53550d15578eadfd6f0c9bfde745b9af9d2d0891280db`). Isso verifica a publicação do checksum, não substitui conferir o binário baixado.
+
+A consulta automática de atualizações da beta.2 e da beta.3 retornou `unavailable` nesta rodada. Diagnóstico direto confirmou **HTTP 403, `x-ratelimit-remaining: 0`**, com mensagem pública de limite de API do GitHub. Não foi atribuído ao conversor nem ocultado; nenhuma mudança de código ou repetição da consulta foi feita. O aplicativo conserva a resposta de indisponibilidade e o link de download direto continua publicado. Os testes de versões/URLs já aprovados na suíte não foram repetidos.
+
+
+A única tentativa de download anônimo do instalador completo expirou após **180 segundos**, deixando zero bytes de binário neste ambiente. Não se afirma conferência local do hash ou da assinatura desse download público. A publicação foi verificada pelo publisher, pela identidade do artefato, pela tag e pelo checksum público; a transferência integral permanece uma verificação externa pendente. Não houve nova tentativa nem alteração de código para contornar a falha. A etapa funcional de conversão/instalação está concluída; a verificação integral do download e a consulta pública de atualizações ficaram limitadas pela rede/API nesta rodada.
